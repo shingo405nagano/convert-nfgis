@@ -1,0 +1,12 @@
+pydantic
+pytest
+pytest-cov
+pytest-html
+pytest-asyncio
+fastkml
+numpy
+pandas
+PyYAML
+pyproj
+shapely
+geopandas
