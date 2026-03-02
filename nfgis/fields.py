@@ -4,34 +4,44 @@
 
 from typing import Any
 
+import pydantic
+
 from .config import ConfigYaml, FieldInfo
 from .enums import Language
 
-
-class GsShpFields(object):
-    """G空間センターで公開されている国有林小班区画の属性管理クラス
-
-    G空間センターで公開されている国有林GISデータの属性名と、変換後の属性名の
-    対応データを管理するクラスです。
+global config_yaml
+config_yaml = ConfigYaml()
 
 
+class BaseFields(pydantic.BaseModel):
+    """属性管理の基底クラス
+
+    属性管理クラスは、データの属性名やデータ型、デフォルト値などの情報を定義するクラスです。
     """
 
-    def __init__(self):
-        config = ConfigYaml()
-        self.fields = config.gs_shp_fields
+    fields: dict[str, FieldInfo] = pydantic.Field(default_factory=dict)
 
-    @property
+    @pydantic.field_validator("fields", mode="before")
+    def validate_fields(cls, v):
+        if not isinstance(v, dict):
+            raise ValueError("fieldsは辞書でなければなりません。")
+        for key, value in v.items():
+            if not isinstance(key, str):
+                raise ValueError("fieldsのキーは文字列でなければなりません。")
+            if not isinstance(value, FieldInfo):
+                raise ValueError(
+                    "fieldsの値はFieldInfoのインスタンスでなければなりません。"
+                )
+        return v
+
     def original_field_names(self) -> list[str]:
         """元の属性名のリストを返します。"""
         return list(self.fields.keys())
 
-    @property
     def japanese_field_names(self) -> list[str]:
         """日本語の属性名のリストを返します。"""
         return [field_info.ja for field_info in self.fields.values()]
 
-    @property
     def english_field_names(self) -> list[str]:
         """英語の属性名のリストを返します。"""
         return [field_info.en for field_info in self.fields.values()]
@@ -82,3 +92,52 @@ class GsShpFields(object):
         """
         field_info = self.get_field_info(name, lang)
         return field_info.type_cast(value)
+
+
+class GsShpFields(BaseFields):
+    """G空間センターで公開されている、国有林の林小班区画データの属性管理クラスです。"""
+
+    def __init__(self):
+        super().__init__(fields=config_yaml.gs_shp_fields)
+
+
+class GsForestRoadFields(BaseFields):
+    """G空間センターで公開されている、国有林の林道データの属性管理クラスです。"""
+
+    def __init__(self):
+        super().__init__(fields=config_yaml.gs_forest_road_shp_fields)
+
+
+class DissolvedOfficeFields(BaseFields):
+    """森林管理署担当区域データの属性管理クラスです。"""
+
+    def __init__(self):
+        super().__init__(fields=config_yaml.dissolved_office_fields)
+
+
+class DissolvedBranchOfficeFields(BaseFields):
+    """森林管理署支署担当区域データの属性管理クラスです。"""
+
+    def __init__(self):
+        super().__init__(fields=config_yaml.dissolved_branch_office_fields)
+
+
+class DissolvedLocalityFields(BaseFields):
+    """森林管理署地域区分データの属性管理クラスです。"""
+
+    def __init__(self):
+        super().__init__(fields=config_yaml.dissolved_locality_fields)
+
+
+class DissolvedMainAddressFields(BaseFields):
+    """森林管理署地域区分データの属性管理クラスです。"""
+
+    def __init__(self):
+        super().__init__(fields=config_yaml.dissolved_main_address_fields)
+
+
+class DissolvedProtectedForestFields(BaseFields):
+    """森林管理署地域区分データの属性管理クラスです。"""
+
+    def __init__(self):
+        super().__init__(fields=config_yaml.dissolved_protected_forest_fields)

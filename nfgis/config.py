@@ -78,7 +78,27 @@ class ConfigYaml(object):
         data = self.field_yaml["gs"]["forest_road_shp"]
         return {key: FieldInfo(**value) for key, value in data.items()}
 
+    @property
+    def dissolved_office_fields(self) -> dict[str, FieldInfo]:
+        data = self.field_yaml["dissolved"]["office"]
+        return {key: FieldInfo(**value) for key, value in data.items()}
 
-if __name__ == "__main__":
-    config = ConfigYaml()
-    print(config.gs_forest_road_shp_fields)
+    @property
+    def dissolved_branch_office_fields(self) -> dict[str, FieldInfo]:
+        data = self.field_yaml["dissolved"]["branch_office"]
+        return {key: FieldInfo(**value) for key, value in data.items()}
+
+    @property
+    def dissolved_locality_fields(self) -> dict[str, FieldInfo]:
+        data = self.field_yaml["dissolved"]["locality"]
+        return {key: FieldInfo(**value) for key, value in data.items()}
+
+    @property
+    def dissolved_main_address_fields(self) -> dict[str, FieldInfo]:
+        data = self.field_yaml["dissolved"]["main_address"]
+        return {key: FieldInfo(**value) for key, value in data.items()}
+
+    @property
+    def dissolved_protected_forest_fields(self) -> dict[str, FieldInfo]:
+        data = self.field_yaml["dissolved"]["protected_forest"]
+        return {key: FieldInfo(**value) for key, value in data.items()}
