@@ -4,13 +4,13 @@
 ```python
 >>> from nfgis.fetch import GsShp
 >>> gs_shp = GsShp(prefecture="青森県", caterory="address", endswith=".shp")
->>> print("office_names:", gs_shp.office_names)
-office_names: ['三八上北', '下北', '東青', '津軽']
->>> office = "東青"
->>> _gdf = gs_shp.query_shp(office=office, columns=["署名称", "担当区"], file="小班区画", endswith=".shp")
+>>> print("plan_area_names:", gs_shp.plan_area_names)
+plan_area_names: ['三八上北', '下北', '東青', '津軽']
+>>> plan_area = "東青"
+>>> _gdf = gs_shp.query_shp(plan_area=plan_area, columns=["署名称", "担当区"], file="小班区画", endswith=".shp")
 >>> print("branch_office_names", _gdf["担当区"].unique())
 branch_office_names ['広瀬後潟',   '宮田',   '大平',   '今別',  '大川平',   '三厩',   '龍飛',   '蟹田',  '八甲田', '平内',  '内真部', '北八甲田',    nan]
->>> gdf = gs_shp.read_file(office=office, file="小班区画", endswith=".shp")
+>>> gdf = gs_shp.read_file(plan_area=plan_area, file="小班区画", endswith=".shp")
 >>> print("gdf.shape:", gdf.shape)
 gdf.shape: (1234, 56)
 # Zipファイル内のカテゴリーを全て読み込む
@@ -89,7 +89,7 @@ class GsShp(object):
         self.temp_dir_path: str | None = None
         self.extract_root_path: str | None = None
         self.fetch_and_extract()
-        self.office_names = self.get_office_names()
+        self.plan_area_names = self.get_plan_area_names()
 
     def fetch_and_extract(self) -> None:
         """指定された都道府県のZIPをダウンロードし、Tempディレクトリへ展開します。"""
@@ -127,43 +127,42 @@ class GsShp(object):
         return os.path.join(self.temp_dir_path, top_dir)
 
     @staticmethod
-    def _normalize_office_name(name: str) -> str:
+    def _normalize_plan_area_name(name: str) -> str:
         result = re.sub(r"[0-9０-９]", "", name)
-        result = result.replace("森林計画区", "")
         return result.strip()
 
-    def get_office_names(self) -> list[str]:
+    def get_plan_area_names(self) -> list[str]:
         """展開したディレクトリから森林計画区名を抽出して返します。"""
         if not self.extract_root_path or not os.path.isdir(self.extract_root_path):
             return []
 
-        office_names = []
+        plan_area_names = []
         for entry in os.listdir(self.extract_root_path):
             full_path = os.path.join(self.extract_root_path, entry)
             if not os.path.isdir(full_path):
                 continue
 
-            normalized = self._normalize_office_name(entry)
+            normalized = self._normalize_plan_area_name(entry)
             if normalized:
-                office_names.append(normalized)
+                plan_area_names.append(normalized)
 
-        return sorted(set(office_names))
+        return sorted(set(plan_area_names))
 
-    def select_file_path(self, office: str) -> str:
+    def select_file_path(self, plan_area: str) -> str:
         """指定された森林計画区の対象Shapefileパスを返します。"""
         if not self.extract_root_path or not os.path.isdir(self.extract_root_path):
             raise ValueError("データ展開先ディレクトリが存在しません。")
 
         for entry in os.listdir(self.extract_root_path):
-            office_dir = os.path.join(self.extract_root_path, entry)
-            if not os.path.isdir(office_dir):
+            plan_area_dir = os.path.join(self.extract_root_path, entry)
+            if not os.path.isdir(plan_area_dir):
                 continue
 
-            normalized = self._normalize_office_name(entry)
-            if office not in entry and office not in normalized:
+            normalized = self._normalize_plan_area_name(entry)
+            if plan_area not in entry and plan_area not in normalized:
                 continue
 
-            for root, _, files in os.walk(office_dir):
+            for root, _, files in os.walk(plan_area_dir):
                 for filename in files:
                     if self.file_name in filename and filename.endswith(self.endswith):
                         return os.path.join(root, filename)
@@ -175,19 +174,19 @@ class GsShp(object):
         return pyogrio.read_dataframe(shp_path)
 
     def query_shp(
-        self, office: str, columns: list[str] | None = None
+        self, plan_area: str, columns: list[str] | None = None
     ) -> gpd.GeoDataFrame:
         """指定森林計画区のShapefileを読み込み、必要ならカラムを絞って返します。"""
-        shp_path = self.select_file_path(office=office)
+        shp_path = self.select_file_path(plan_area=plan_area)
         return pyogrio.read_dataframe(shp_path, columns=columns)
 
-    def select_file(self, office: str) -> str:
+    def select_file(self, plan_area: str) -> str:
         """後方互換: select_file_path のエイリアス。"""
-        return self.select_file_path(office=office)
+        return self.select_file_path(plan_area=plan_area)
 
-    def read_file(self, office: str) -> gpd.GeoDataFrame:
+    def read_file(self, plan_area: str) -> gpd.GeoDataFrame:
         """後方互換: 指定森林計画区のShapefileをGeoDataFrameとして返します。"""
-        shp_path = self.select_file_path(office=office)
+        shp_path = self.select_file_path(plan_area=plan_area)
         return self.read_shp(shp_path)
 
     def read_category(self) -> dict[str, dict[str, dict[str, list[str]]]]:
@@ -215,13 +214,12 @@ class GsShp(object):
         }
         ```
         """
-        qcols = ["署名称", "担当区", "国有林名"]
+        qcols = ["計画区", "署名称", "担当区", "国有林名"]
         data = {}
-        for office in self.office_names:
-            _gdf = self.query_shp(office=office, columns=qcols)
-            _gdf["計画区"] = office
+        for plan_area in self.plan_area_names:
+            _gdf = self.query_shp(plan_area=plan_area, columns=qcols)
             grouped = (
-                _gdf.groupby(by=["計画区"] + qcols)
+                _gdf.groupby(by=qcols)
                 .agg({"geometry": "count"})
                 .reset_index()
                 .sort_values(by=qcols)
