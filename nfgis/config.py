@@ -10,6 +10,10 @@ global FIELD_YAML
 with open(os.path.join(dirname, ".confs", "fields.yaml"), "r", encoding="utf-8") as f:
     FIELD_YAML = yaml.safe_load(f)
 
+global URL_YAML
+with open(os.path.join(dirname, ".confs", "urls.yaml"), "r", encoding="utf-8") as f:
+    URL_YAML = yaml.safe_load(f)
+
 
 class FieldInfo(pydantic.BaseModel):
     """属性情報を表すクラス
@@ -67,6 +71,7 @@ class ConfigYaml(object):
 
     def __init__(self):
         self.field_yaml = FIELD_YAML
+        self.url_yaml = URL_YAML
 
     @property
     def gs_shp_fields(self) -> dict[str, FieldInfo]:
@@ -102,3 +107,22 @@ class ConfigYaml(object):
     def dissolved_protected_forest_fields(self) -> dict[str, FieldInfo]:
         data = self.field_yaml["dissolved"]["protected_forest"]
         return {key: FieldInfo(**value) for key, value in data.items()}
+
+    def get_shp_zip_url(self, prefecture: str) -> str:
+        """都道府県名から対応するShpファイルのZipダウンロードURLを取得します。
+
+        Args:
+            prefecture (str): 都道府県名
+
+        Returns:
+            str: 対応するShpファイルのZipダウンロードURL
+
+        Raises:
+            ValueError: 指定された都道府県に対応するURLが見つからない場合
+        """
+        url = self.url_yaml.get("GS_SHAPE_URLS", {}).get(prefecture)
+        if url is None:
+            raise ValueError(
+                f"指定された都道府県 '{prefecture}' に対応するURLが見つかりません。"
+            )
+        return url
