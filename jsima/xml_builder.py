@@ -3,10 +3,12 @@ import os
 
 
 from copy import deepcopy
-from datetime import datetime
+import datetime
 from pathlib import Path
 from typing import Any
 import xml.etree.ElementTree as ET
+
+from .enums import JsimaCoordinateSystemEnum, JsimaCrsEnum
 
 global TEMPLATE_JSIMA_XML
 TEMPLATE_JSIMA_XML = os.path.join(os.path.dirname(__file__), ".confs", "jsima.xml")
@@ -45,7 +47,7 @@ class JsimaXmlBuilder(object):
         self._dataset = self.root.find("jsima:dataset", self.NS)
         if self._dataset is None:
             raise ValueError("テンプレート内に <jsima:dataset> が見つかりません。")
-        self.root.set("timeStamp", datetime.now().isoformat(timespec="seconds"))
+        self.root.set("timeStamp", datetime.datetime.now().isoformat(timespec="seconds"))
 
     def add_dataset_element(
         self,
@@ -91,6 +93,61 @@ class JsimaXmlBuilder(object):
         for child in list(parsed):
             self._dataset.append(deepcopy(child)) # type: ignore # 
 
+    def add_genba_joho(
+        self,
+        name: str,
+        coordinate_system: JsimaCoordinateSystemEnum | int,
+        crs: JsimaCrsEnum | int,
+        start: datetime.date | str | None = None,
+        end: datetime.date | str | None = None,
+    ) -> ET.Element:
+        """`<jsima:dataset>`配下に現場情報 (`jsima:GenbaJoho`) を追加する。
+
+        追加時に、現場情報の見出しコメントも合わせて追加する。
+
+        Args:
+            name: 現場名（必須）。
+            coordinate_system: 座標系（必須）。`JsimaCoordinateSystemEnum` またはその値。
+            crs: 測地系（必須）。`JsimaCrsEnum` またはその値。
+            start: 開始日。`None` の場合は当日。
+            end: 終了日。`None` の場合は当日。
+
+        Returns:
+            追加した `jsima:GenbaJoho` 要素。
+
+        ## JsimaCoordinateSystemEnum:
+          - JPR_01 = 1
+          - JPR_02 = 2
+          ...
+          - JPR_19 = 19
+        ## JsimaCrsEnum:
+          - JGD_2000 = 1
+          - JGD_2011 = 2
+          - JGD_2024 = 3
+        
+        """
+        coordinate_system_value = self._coerce_enum_value(
+            coordinate_system,
+            JsimaCoordinateSystemEnum,
+            "coordinate_system",
+        )
+        crs_value = self._coerce_enum_value(crs, JsimaCrsEnum, "crs")
+        start_text = self._format_jsima_date(start)
+        end_text = self._format_jsima_date(end)
+
+        self._dataset.append(ET.Comment(" ===================================================================== "))  # type: ignore[arg-type]
+        self._dataset.append(ET.Comment("現場情報"))  # type: ignore[arg-type]
+
+        genba = ET.SubElement(self._dataset, f"{{{self.NS['jsima']}}}GenbaJoho")
+        ET.SubElement(genba, f"{{{self.NS['jsima']}}}Name").text = name
+        ET.SubElement(genba, f"{{{self.NS['jsima']}}}CoordinateSystem").text = str(
+            coordinate_system_value
+        )
+        ET.SubElement(genba, f"{{{self.NS['jsima']}}}Crs").text = str(crs_value)
+        ET.SubElement(genba, f"{{{self.NS['jsima']}}}Start").text = start_text
+        ET.SubElement(genba, f"{{{self.NS['jsima']}}}End").text = end_text
+        return genba
+
     def save(self, output_path: str = "./jsima.xml", encoding: str = "utf-8") -> Path:
         """現在のXML内容をファイルへ保存する。
 
@@ -125,3 +182,32 @@ class JsimaXmlBuilder(object):
         """ElementTreeへ利用する名前空間を登録する。"""
         for prefix, uri in cls.NS.items():
             ET.register_namespace(prefix, uri)
+
+    @staticmethod
+    def _format_jsima_date(value: datetime.date | str | None) -> str:
+        """JSIMA向けの日付文字列を `YYYY-M-D` 形式で返す。"""
+        if value is None:
+            current = datetime.date.today()
+            return f"{current.year}-{current.month}-{current.day}"
+        if isinstance(value, datetime.date):
+            return f"{value.year}-{value.month}-{value.day}"
+        return value
+
+    @staticmethod
+    def _coerce_enum_value(
+        value: Any,
+        enum_cls: type[JsimaCoordinateSystemEnum] | type[JsimaCrsEnum],
+        arg_name: str,
+    ) -> int:
+        """Enumまたは整数を受け取り、Enum定義された整数値へ正規化する。"""
+        if isinstance(value, enum_cls):
+            return int(value.value)
+
+        try:
+            as_int = int(value)
+            enum_cls(as_int)
+            return as_int
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"{arg_name} は {enum_cls.__name__} の有効な値を指定してください。"
+            ) from exc
