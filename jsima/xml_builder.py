@@ -1,14 +1,14 @@
 from __future__ import annotations
-import os
 
-
-from copy import deepcopy
 import datetime
+import os
+import xml.etree.ElementTree as ET
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
-import xml.etree.ElementTree as ET
 
-from .enums import JsimaCoordinateSystemEnum, JsimaCrsEnum
+from .enums import JsimaCoordinateSystemEnum, JsimaCrsEnum, JsimaJpsUuidRefEnum
+from .gm_point import JsimaGmPointModel, JsimaGmPointModels
 
 global TEMPLATE_JSIMA_XML
 TEMPLATE_JSIMA_XML = os.path.join(os.path.dirname(__file__), ".confs", "jsima.xml")
@@ -47,10 +47,13 @@ class JsimaXmlBuilder(object):
         self._register_namespaces()
         self.tree = ET.parse(self.template_path)
         self.root = self.tree.getroot()
-        self._dataset = self.root.find("jsima:dataset", self.NS)
-        if self._dataset is None:
+        dataset = self.root.find("jsima:dataset", self.NS)
+        if dataset is None:
             raise ValueError("テンプレート内に <jsima:dataset> が見つかりません。")
-        self.root.set("timeStamp", datetime.datetime.now().isoformat(timespec="seconds"))
+        self._dataset: ET.Element = dataset
+        self.root.set(
+            "timeStamp", datetime.datetime.now().isoformat(timespec="seconds")
+        )
 
     def add_dataset_element(
         self,
@@ -77,7 +80,7 @@ class JsimaXmlBuilder(object):
         element = ET.Element(f"{{{uri}}}{local_name}", attrib=attrib or {})
         if text is not None:
             element.text = text
-        self._dataset.append(element)# type: ignore # 
+        self._dataset.append(element)  # type: ignore #
         return element
 
     def add_dataset_xml(self, xml_fragment: str) -> None:
@@ -87,14 +90,14 @@ class JsimaXmlBuilder(object):
             xml_fragment: 追加したいXML文字列。
         """
         wrapper = (
-            f"<root xmlns:jsima=\"{self.NS['jsima']}\" "
-            f"xmlns:jps=\"{self.NS['jps']}\" "
-            f"xmlns:xsi=\"{self.NS['xsi']}\" "
-            f"xmlns:xlink=\"{self.NS['xlink']}\">{xml_fragment}</root>"
+            f'<root xmlns:jsima="{self.NS["jsima"]}" '
+            f'xmlns:jps="{self.NS["jps"]}" '
+            f'xmlns:xsi="{self.NS["xsi"]}" '
+            f'xmlns:xlink="{self.NS["xlink"]}">{xml_fragment}</root>'
         )
         parsed = ET.fromstring(wrapper)
         for child in list(parsed):
-            self._dataset.append(deepcopy(child)) # type: ignore # 
+            self._dataset.append(deepcopy(child))  # type: ignore #
 
     def add_genba_joho(
         self,
@@ -127,7 +130,7 @@ class JsimaXmlBuilder(object):
           - JGD_2000 = 1
           - JGD_2011 = 2
           - JGD_2024 = 3
-        
+
         """
         coordinate_system_value = self._coerce_enum_value(
             coordinate_system,
@@ -138,7 +141,11 @@ class JsimaXmlBuilder(object):
         start_text = self._format_jsima_date(start)
         end_text = self._format_jsima_date(end)
 
-        self._dataset.append(ET.Comment(" ===================================================================== "))  # type: ignore[arg-type]
+        self._dataset.append(
+            ET.Comment(
+                " ===================================================================== "
+            )
+        )  # type: ignore[arg-type]
         self._dataset.append(ET.Comment("現場情報"))  # type: ignore[arg-type]
 
         genba = ET.SubElement(self._dataset, f"{{{self.NS['jsima']}}}GenbaJoho")
@@ -150,6 +157,26 @@ class JsimaXmlBuilder(object):
         ET.SubElement(genba, f"{{{self.NS['jsima']}}}Start").text = start_text
         ET.SubElement(genba, f"{{{self.NS['jsima']}}}End").text = end_text
         return genba
+
+    def add_gm_point(
+        self,
+        point_id: str,
+        uuidref: JsimaJpsUuidRefEnum | str,
+        x: float,
+        y: float,
+    ) -> ET.Element:
+        """`<jsima:object>`配下に`<jps:GM_Point>`を1件追加する。"""
+        model = JsimaGmPointModel(id=point_id, uuidref=uuidref, x=x, y=y)
+        object_element = self._get_or_create_object_element()
+        return self._append_gm_point_element(object_element, model)
+
+    def add_gm_points(self, points: JsimaGmPointModels) -> list[ET.Element]:
+        """`JsimaGmPointModels`内の全`GM_Point`を`<jsima:object>`へ追加する。"""
+        object_element = self._get_or_create_object_element()
+        result: list[ET.Element] = []
+        for point in points.values():
+            result.append(self._append_gm_point_element(object_element, point))
+        return result
 
     def save(self, output_path: str = "./jsima.xml", encoding: str = "utf-8") -> Path:
         """現在のXML内容をファイルへ保存する。
@@ -195,6 +222,41 @@ class JsimaXmlBuilder(object):
         if isinstance(value, datetime.date):
             return f"{value.year}-{value.month}-{value.day}"
         return value
+
+    def _get_or_create_object_element(self) -> ET.Element:
+        """`<jsima:dataset>`直下の`<jsima:object>`を取得または作成する。"""
+        object_element = self._dataset.find("jsima:object", self.NS)
+        if object_element is None:
+            object_element = ET.SubElement(
+                self._dataset, f"{{{self.NS['jsima']}}}object"
+            )
+        return object_element
+
+    def _append_gm_point_element(
+        self, object_element: ET.Element, point: JsimaGmPointModel
+    ) -> ET.Element:
+        """`<jsima:object>`配下へ`<jps:GM_Point>`を追加する。"""
+        if object_element.find("jps:GM_Point", self.NS) is None:
+            object_element.append(
+                ET.Comment(
+                    " ================================================================= "
+                )
+            )  # type: ignore[arg-type]
+            object_element.append(ET.Comment("参照される座標"))  # type: ignore[arg-type]
+
+        gm_point = ET.SubElement(
+            object_element,
+            f"{{{self.NS['jps']}}}GM_Point",
+            attrib={"id": point.id},
+        )
+        ET.SubElement(
+            gm_point, f"{{{self.NS['jps']}}}CRS", attrib={"uuidref": point.uuidref}
+        )
+        position = ET.SubElement(gm_point, f"{{{self.NS['jps']}}}position")
+        ET.SubElement(
+            position, f"{{{self.NS['jps']}}}coordinate"
+        ).text = f"{point.x:.3f} {point.y:.3f}"
+        return gm_point
 
     @staticmethod
     def _coerce_enum_value(

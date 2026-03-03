@@ -66,6 +66,14 @@ class JsimaGmPointModels(object):
                     id=point_id, uuidref=uuidref, x=x, y=y
                 )
 
+    def as_dict(self) -> dict[str, JsimaGmPointModel]:
+        """座標文字列キーで保持したGM_Point辞書を返す。"""
+        return dict(self._points)
+
+    def values(self) -> list[JsimaGmPointModel]:
+        """保持しているGM_Pointモデル一覧を返す。"""
+        return list(self._points.values())
+
     def _generate_id(self, index: int) -> str:
         """indexからGM_PointのIDを生成する
 
