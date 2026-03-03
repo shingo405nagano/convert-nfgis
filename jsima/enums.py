@@ -57,3 +57,12 @@ class JsimaCrsEnum(Enum):
     JGD_2000 = 1
     JGD_2011 = 2
     JGD_2024 = 3
+
+class JsimaJpsUuidRefEnum(StrEnum):
+    """JPGISのCRS UUIDを表す列挙型
+
+    使用するタグは'<jps:CRS uuidref="..."/>'
+    """
+    JGD_2000_PL10 = "jpsuuid:jgd2000.pl10"
+    JGD_2011_PL10 = "jpsuuid:jgd2011.pl10"
+    JGD_2024_PL10 = "jpsuuid:jgd2024.pl10"
