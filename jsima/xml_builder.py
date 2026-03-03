@@ -20,11 +20,14 @@ class JsimaXmlBuilder(object):
     Example:
         >>> from jsima.xml_builder import JsimaXmlBuilder
         >>> builder = JsimaXmlBuilder("./jsima.xml")
-        >>> builder.add_dataset_xml(
-        ...     '<jsima:GenbaJoho><jsima:Name>test</jsima:Name></jsima:GenbaJoho>'
+        >>> builder.add_genba_joho(
+        ...     name="test-build-genba",
+        ...     coordinate_system=JsimaCoordinateSystemEnum.JPR_10,
+        ...     crs=JsimaCrsEnum.JGD_2024,
+        ...     start="2026-3-3",
+        ...     end="2026-3-4",
         ... )
         >>> builder.save("./output_jsima.xml")
-        PosixPath('output_jsima.xml')
     """
 
     NS = {
