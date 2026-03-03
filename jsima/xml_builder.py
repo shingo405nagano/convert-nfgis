@@ -164,9 +164,30 @@ class JsimaXmlBuilder(object):
         uuidref: JsimaJpsUuidRefEnum | str,
         x: float,
         y: float,
+        number: int | None = None,
+        name: str = "",
     ) -> ET.Element:
         """`<jsima:object>`配下に`<jps:GM_Point>`を1件追加する。"""
-        model = JsimaGmPointModel(id=point_id, uuidref=uuidref, x=x, y=y)
+        point_number = number
+        if point_number is None:
+            if not point_id.startswith("pnt"):
+                raise ValueError("point_id は 'pnt0000001' 形式で指定してください。")
+            try:
+                point_number = int(point_id[3:])
+            except ValueError as exc:
+                raise ValueError(
+                    "point_id は 'pnt0000001' 形式で指定してください。"
+                ) from exc
+
+        model = JsimaGmPointModel(
+            x=x,
+            y=y,
+            uuidref=uuidref,
+            number=point_number,
+            name=name,
+        )
+        if model.id != point_id:
+            raise ValueError("point_id と number の組み合わせが不正です。")
         object_element = self._get_or_create_object_element()
         return self._append_gm_point_element(object_element, model)
 
@@ -176,6 +197,17 @@ class JsimaXmlBuilder(object):
         result: list[ET.Element] = []
         for point in points.values():
             result.append(self._append_gm_point_element(object_element, point))
+        return result
+
+    def add_sokuten(self, point: JsimaGmPointModel) -> ET.Element:
+        """`<jsima:object>`配下に`<jsima:Sokuten>`を1件追加する。"""
+        return self._append_sokuten_element(point)
+
+    def add_sokutens(self, points: JsimaGmPointModels) -> list[ET.Element]:
+        """`JsimaGmPointModels`内の全`Sokuten`を`<jsima:object>`へ追加する。"""
+        result: list[ET.Element] = []
+        for point in points.values():
+            result.append(self._append_sokuten_element(point))
         return result
 
     def save(self, output_path: str = "./jsima.xml", encoding: str = "utf-8") -> Path:
@@ -257,6 +289,31 @@ class JsimaXmlBuilder(object):
             position, f"{{{self.NS['jps']}}}coordinate"
         ).text = f"{point.x:.3f} {point.y:.3f}"
         return gm_point
+
+    def _append_sokuten_element(self, point: JsimaGmPointModel) -> ET.Element:
+        """`<jsima:object>`配下へ`<jsima:Sokuten>`を追加する。"""
+        object_element = self._get_or_create_object_element()
+        if object_element.find("jsima:Sokuten", self.NS) is None:
+            object_element.append(
+                ET.Comment(
+                    " ================================================================= "
+                )
+            )  # type: ignore[arg-type]
+            object_element.append(ET.Comment("測点"))  # type: ignore[arg-type]
+
+        sokuten = ET.SubElement(
+            object_element,
+            f"{{{self.NS['jsima']}}}Sokuten",
+            attrib={"id": point.sokuten_id},
+        )
+        ET.SubElement(sokuten, f"{{{self.NS['jsima']}}}Number").text = str(point.number)
+        ET.SubElement(sokuten, f"{{{self.NS['jsima']}}}Name").text = point.name
+        ET.SubElement(
+            sokuten,
+            f"{{{self.NS['jsima']}}}RefPoint",
+            attrib={"idref": point.id},
+        )
+        return sokuten
 
     @staticmethod
     def _coerce_enum_value(

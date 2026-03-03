@@ -9,18 +9,25 @@ class JsimaGmPointModel(pydantic.BaseModel):
     使用するタグは'<jsima:GM_Point>'
 
     Attributes:
-         - id: GM_PointのID.他のオブジェクトから参照するための識別子
+
          - uuidref: GM_Pointの測地系を表すUUID参照
          - x: GM_PointのX座標
          - y: GM_PointのY座標
+         - id: GM_PointのID.他のオブジェクトから参照するための識別子
+         - number: GM_Pointのインデックス.連番で管理される
+         - name: GM_Pointの名称.任意の文字列
     """
 
-    id: str
-    uuidref: str
     x: float
     y: float
+    uuidref: str
+    number: int
+    id: str = pydantic.Field(default="", description="GM_PointのID")
+    sokuten_id: str = pydantic.Field(default="", description="Sokuten要素のID")
+    name: str = pydantic.Field(default="", description="Sokuten要素の名称")
 
     @pydantic.field_validator("uuidref", mode="before")
+    @classmethod
     def validate_uuidref(cls, value):
         """uuidrefがJsimaJpsUuidRefEnumのいずれかであることを検証する"""
         if value not in JsimaJpsUuidRefEnum:
@@ -30,6 +37,13 @@ class JsimaGmPointModel(pydantic.BaseModel):
         if isinstance(value, JsimaJpsUuidRefEnum):
             return value.value
         return value
+
+    @pydantic.model_validator(mode="after")
+    def _validate_id(self) -> "JsimaGmPointModel":
+        """idが空の場合、numberから自動生成する"""
+        self.id = f"pnt{str(self.number).zfill(7)}"
+        self.sokuten_id = f"simapnt{str(self.number).zfill(7)}"
+        return self
 
 
 class JsimaGmPointModels(object):
@@ -47,6 +61,7 @@ class JsimaGmPointModels(object):
         y_list: list[float],
         uuidref: JsimaJpsUuidRefEnum = JsimaJpsUuidRefEnum.JGD_2024_PL10,
         start_index: int = 1,
+        names: list[str] | None = None,
         **kwargs,
     ):
         """複数のJsimaGmPointModelを管理するクラス
@@ -65,14 +80,27 @@ class JsimaGmPointModels(object):
         """
         self.start_idx = start_index
         self.end_idx = start_index + 1
-        self.__id_template = kwargs.get("id_template", "pnt{index}")
+        # Sokuten要素に名前を付与するためのリストを保持する
+        self.names = []
+        if names is None:
+            self.names = [""] * len(x_list)
+        else:
+            if len(names) != len(x_list):
+                raise ValueError("namesの長さはGM_Pointの数と一致する必要があります")
+            self.names = names
+        # 座標文字列キーで保持したGM_Pointモデルの辞書を作成する
         self._points = {}
-        for i, (x, y) in enumerate(zip(x_list, y_list), start=self.start_idx):
-            point_id = self._generate_id(i)
+        for i, (x, y, name) in enumerate(
+            zip(x_list, y_list, self.names), start=self.start_idx
+        ):
             key = f"{x:.3f} {y:.3f}"
             if key not in self._points:
                 self._points[key] = JsimaGmPointModel(
-                    id=point_id, uuidref=uuidref, x=x, y=y
+                    x=x,
+                    y=y,
+                    uuidref=uuidref,
+                    number=i,
+                    name=name,
                 )
                 self.end_idx = i
 
@@ -83,20 +111,6 @@ class JsimaGmPointModels(object):
     def values(self) -> list[JsimaGmPointModel]:
         """保持しているGM_Pointモデル一覧を返す。"""
         return list(self._points.values())
-
-    def _generate_id(self, index: int) -> str:
-        """indexからGM_PointのIDを生成する
-
-        Args:
-            index: GM_Pointの連番.1から始まる整数
-
-        Returns:
-            GM_PointのID
-        """
-        if not isinstance(index, int):
-            raise ValueError("index must be an integer")
-        idx = str(index).zfill(7)
-        return self.__id_template.format(index=idx)
 
     def search_id(self, x: float, y: float) -> str | None:
         """指定された座標に対応するGM_PointのIDを検索する
