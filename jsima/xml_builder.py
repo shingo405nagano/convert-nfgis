@@ -7,8 +7,13 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-from .enums import JsimaCoordinateSystemEnum, JsimaCrsEnum, JsimaJpsUuidRefEnum
+from .enums import (
+    JsimaCoordinateSystemEnum,
+    JsimaCrsEnum,
+    JsimaJpsUuidRefEnum,
+)
 from .gm_point import JsimaGmPointModel, JsimaGmPointModels
+from .gm_polygon import JsimaGmPolygonModel
 
 global TEMPLATE_JSIMA_XML
 TEMPLATE_JSIMA_XML = os.path.join(os.path.dirname(__file__), ".confs", "jsima.xml")
@@ -210,6 +215,59 @@ class JsimaXmlBuilder(object):
             result.append(self._append_sokuten_element(point))
         return result
 
+    def add_polygon_objects(
+        self,
+        polygon_model: JsimaGmPolygonModel,
+        point_models: JsimaGmPointModels,
+        index: int,
+    ) -> dict[str, ET.Element | list[ET.Element]]:
+        """`<jsima:object>`へ外周由来の`GM_Curve/GM_Surface/Kakuchi/Chiban`を追加する。"""
+        object_element = self._get_or_create_object_element()
+        points = point_models.values()
+        required_points = polygon_model.exterior_vertex_count()
+        if len(points) != required_points:
+            raise ValueError(
+                "point_modelsの点数はpolygon_modelの外周頂点数（閉合点除く）と一致する必要があります。"
+            )
+        if polygon_model.chimoku is None:
+            raise ValueError("polygon_model.chimoku は必須です。")
+
+        curve_elements = self._append_gm_curves(
+            object_element=object_element,
+            points=points,
+            curve_ids=polygon_model.curve_ids(start_index=index),
+        )
+        surface_element = self._append_gm_surface(
+            object_element=object_element,
+            surface_id=polygon_model.surface_id(index),
+            boundary_id=polygon_model.boundary_id(index),
+            ring_id=polygon_model.ring_id(index),
+            curve_ids=polygon_model.curve_ids(start_index=index),
+        )
+        kakuchi_element = self._append_kakuchi(
+            object_element=object_element,
+            kakuchi_id=polygon_model.kakuchi_id(index),
+            number=index,
+            name=polygon_model.name,
+            surface_id=polygon_model.surface_id(index),
+        )
+        chiban_element = self._append_chiban(
+            object_element=object_element,
+            chiban_id=polygon_model.chiban_id(index),
+            chimoku_value=int(polygon_model.chimoku.value),
+            area_text=f"{polygon_model.area(7):.7f}",
+            comment=polygon_model.comment,
+            rotation_value=int(polygon_model.rotation().value),
+            kakuchi_id=polygon_model.kakuchi_id(index),
+        )
+
+        return {
+            "curves": curve_elements,
+            "surface": surface_element,
+            "kakuchi": kakuchi_element,
+            "chiban": chiban_element,
+        }
+
     def save(self, output_path: str = "./jsima.xml", encoding: str = "utf-8") -> Path:
         """現在のXML内容をファイルへ保存する。
 
@@ -314,6 +372,189 @@ class JsimaXmlBuilder(object):
             attrib={"idref": point.id},
         )
         return sokuten
+
+    def _append_gm_curves(
+        self,
+        object_element: ET.Element,
+        points: list[JsimaGmPointModel],
+        curve_ids: list[str],
+    ) -> list[ET.Element]:
+        """外周を構成する`GM_Curve`群を追加する。"""
+        self._append_section_comment_once(object_element, "jps:GM_Curve", "GM_Curve")
+        result: list[ET.Element] = []
+        size = len(points)
+        for i, curve_id in enumerate(curve_ids):
+            start_point = points[i].id
+            end_point = points[(i + 1) % size].id
+            curve = ET.SubElement(
+                object_element,
+                f"{{{self.NS['jps']}}}GM_Curve",
+                attrib={"id": curve_id},
+            )
+            ET.SubElement(curve, f"{{{self.NS['jps']}}}CRS")
+            ET.SubElement(
+                curve, f"{{{self.NS['jps']}}}proxy", attrib={"idref": curve_id}
+            )
+            ET.SubElement(
+                curve,
+                f"{{{self.NS['jps']}}}proxy",
+                attrib={"idref": f"_{curve_id}"},
+            )
+            ET.SubElement(curve, f"{{{self.NS['jps']}}}orientation").text = "+"
+            ET.SubElement(
+                curve, f"{{{self.NS['jps']}}}primitive", attrib={"idref": curve_id}
+            )
+            segment = ET.SubElement(curve, f"{{{self.NS['jps']}}}segment")
+            line_string = ET.SubElement(segment, f"{{{self.NS['jps']}}}GM_LineString")
+            ET.SubElement(
+                line_string, f"{{{self.NS['jps']}}}interpolation"
+            ).text = "linear"
+            control_point = ET.SubElement(
+                line_string, f"{{{self.NS['jps']}}}controlPoint"
+            )
+
+            start_column = ET.SubElement(control_point, f"{{{self.NS['jps']}}}column")
+            start_indirect = ET.SubElement(
+                start_column, f"{{{self.NS['jps']}}}indirect"
+            )
+            ET.SubElement(
+                start_indirect,
+                f"{{{self.NS['jps']}}}point",
+                attrib={"idref": start_point},
+            )
+
+            end_column = ET.SubElement(control_point, f"{{{self.NS['jps']}}}column")
+            end_indirect = ET.SubElement(end_column, f"{{{self.NS['jps']}}}indirect")
+            ET.SubElement(
+                end_indirect,
+                f"{{{self.NS['jps']}}}point",
+                attrib={"idref": end_point},
+            )
+            result.append(curve)
+        return result
+
+    def _append_gm_surface(
+        self,
+        object_element: ET.Element,
+        surface_id: str,
+        boundary_id: str,
+        ring_id: str,
+        curve_ids: list[str],
+    ) -> ET.Element:
+        """`GM_Surface`を追加する。"""
+        self._append_section_comment_once(
+            object_element, "jps:GM_Surface", "GM_Surface"
+        )
+        surface = ET.SubElement(
+            object_element,
+            f"{{{self.NS['jps']}}}GM_Surface",
+            attrib={"id": surface_id},
+        )
+        ET.SubElement(surface, f"{{{self.NS['jps']}}}orientation").text = "+"
+        ET.SubElement(
+            surface, f"{{{self.NS['jps']}}}primitive", attrib={"idref": surface_id}
+        )
+        patch = ET.SubElement(surface, f"{{{self.NS['jps']}}}patch")
+        polygon = ET.SubElement(patch, f"{{{self.NS['jps']}}}GM_Polygon")
+        ET.SubElement(polygon, f"{{{self.NS['jps']}}}interpolation").text = "planar"
+        boundary = ET.SubElement(
+            polygon,
+            f"{{{self.NS['jps']}}}boundary",
+            attrib={"id": boundary_id},
+        )
+        ET.SubElement(
+            boundary, f"{{{self.NS['jps']}}}element", attrib={"idref": ring_id}
+        )
+        exterior = ET.SubElement(
+            boundary,
+            f"{{{self.NS['jps']}}}exterior",
+            attrib={"id": ring_id},
+        )
+        ET.SubElement(exterior, f"{{{self.NS['jps']}}}CRS")
+        ET.SubElement(exterior, f"{{{self.NS['jps']}}}orientation").text = "+"
+        ET.SubElement(
+            exterior, f"{{{self.NS['jps']}}}primitive", attrib={"idref": ring_id}
+        )
+        for curve_id in curve_ids:
+            ET.SubElement(
+                exterior,
+                f"{{{self.NS['jps']}}}generator",
+                attrib={"idref": curve_id},
+            )
+        return surface
+
+    def _append_kakuchi(
+        self,
+        object_element: ET.Element,
+        kakuchi_id: str,
+        number: int,
+        name: str,
+        surface_id: str,
+    ) -> ET.Element:
+        """`Kakuchi`を追加する。"""
+        self._append_section_comment_once(object_element, "jsima:Kakuchi", "画地")
+        kakuchi = ET.SubElement(
+            object_element,
+            f"{{{self.NS['jsima']}}}Kakuchi",
+            attrib={"id": kakuchi_id},
+        )
+        ET.SubElement(kakuchi, f"{{{self.NS['jsima']}}}Number").text = str(number)
+        ET.SubElement(kakuchi, f"{{{self.NS['jsima']}}}Name").text = name
+        ET.SubElement(
+            kakuchi,
+            f"{{{self.NS['jsima']}}}RefSurface",
+            attrib={"idref": surface_id},
+        )
+        return kakuchi
+
+    def _append_chiban(
+        self,
+        object_element: ET.Element,
+        chiban_id: str,
+        chimoku_value: int,
+        area_text: str,
+        comment: str | None,
+        rotation_value: int,
+        kakuchi_id: str,
+    ) -> ET.Element:
+        """`Chiban`を追加する。"""
+        self._append_section_comment_once(object_element, "jsima:Chiban", "地番")
+        chiban = ET.SubElement(
+            object_element,
+            f"{{{self.NS['jsima']}}}Chiban",
+            attrib={"id": chiban_id},
+        )
+        ET.SubElement(chiban, f"{{{self.NS['jsima']}}}Chimoku").text = str(
+            chimoku_value
+        )
+        ET.SubElement(chiban, f"{{{self.NS['jsima']}}}Area").text = area_text
+        if comment is not None:
+            ET.SubElement(chiban, f"{{{self.NS['jsima']}}}Comment").text = comment
+        ET.SubElement(chiban, f"{{{self.NS['jsima']}}}Rotation").text = str(
+            rotation_value
+        )
+        ET.SubElement(
+            chiban,
+            f"{{{self.NS['jsima']}}}RefKakuchi",
+            attrib={"idref": kakuchi_id},
+        )
+        return chiban
+
+    def _append_section_comment_once(
+        self,
+        object_element: ET.Element,
+        element_xpath: str,
+        title: str,
+    ) -> None:
+        """対象要素が未作成の場合のみ見出しコメントを追加する。"""
+        if object_element.find(element_xpath, self.NS) is not None:
+            return
+        object_element.append(
+            ET.Comment(
+                " ================================================================= "
+            )
+        )  # type: ignore[arg-type]
+        object_element.append(ET.Comment(title))  # type: ignore[arg-type]
 
     @staticmethod
     def _coerce_enum_value(
