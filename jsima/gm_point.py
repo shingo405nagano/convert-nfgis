@@ -46,6 +46,7 @@ class JsimaGmPointModels(object):
         x_list: list[float],
         y_list: list[float],
         uuidref: JsimaJpsUuidRefEnum = JsimaJpsUuidRefEnum.JGD_2024_PL10,
+        start_index: int = 1,
         **kwargs,
     ):
         """複数のJsimaGmPointModelを管理するクラス
@@ -55,16 +56,25 @@ class JsimaGmPointModels(object):
             y_list: GM_PointのY座標のリスト
             uuidref: GM_Pointの測地系を表すUUID参照
             id_template: GM_PointのIDテンプレート.デフォルトは'pnt{index}'で、indexは1から始まる連番
+            start_index: GM_Pointの連番の開始値.デフォルトは1
+
+        Attributes:
+            start_idx: GM_Pointの連番の開始値
+            end_idx: GM_Pointの連番の終了値
+            _points: 座標文字列キーで保持したGM_Pointモデルの辞書
         """
+        self.start_idx = start_index
+        self.end_idx = start_index + 1
         self.__id_template = kwargs.get("id_template", "pnt{index}")
         self._points = {}
-        for i, (x, y) in enumerate(zip(x_list, y_list), start=1):
+        for i, (x, y) in enumerate(zip(x_list, y_list), start=self.start_idx):
             point_id = self._generate_id(i)
             key = f"{x:.3f} {y:.3f}"
             if key not in self._points:
                 self._points[key] = JsimaGmPointModel(
                     id=point_id, uuidref=uuidref, x=x, y=y
                 )
+                self.end_idx = i
 
     def as_dict(self) -> dict[str, JsimaGmPointModel]:
         """座標文字列キーで保持したGM_Point辞書を返す。"""

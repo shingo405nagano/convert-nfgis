@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<jsima:GI xmlns:jsima="http://www.jsima.or.jp/JSIMASchema/201206" xmlns:jps="http://www.gsi.go.jp/GIS/jpgis/standardSchemas2.1_2009-05" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xlink="http://www.w3.org/1999/xlink" xsi:schemaLocation="http://www.jsima.or.jp/JSIMASchema/201206  jsima102.xsd" timeStamp="2026-03-03T08:54:32" version="1.0">
+  <jsima:exchangeMetadata>
+    <jps:datasetCitation>
+      <jps:title>測量データ交換フォーマットSIMAデータ集合</jps:title>
+      <jps:date>
+        <jps:date>2009-09-01</jps:date>
+        <jps:dateType>001</jps:dateType>
+      </jps:date>
+    </jps:datasetCitation>
+    <jps:metadataCitation>
+      <jps:title>測量データ交換フォーマットSIMAの交換メタデータ</jps:title>
+      <jps:date>
+        <jps:date>2009-09-01</jps:date>
+        <jps:dateType>001</jps:dateType>
+      </jps:date>
+    </jps:metadataCitation>
+    <jps:encodingRule>
+      <jps:encodingRuleCitation>
+        <jps:title>SIMA(JPGIS) 附属書B XMLに基づく符号化規制</jps:title>
+        <jps:date>
+          <jps:date>2009-09-01</jps:date>
+          <jps:dateType>001</jps:dateType>
+        </jps:date>
+      </jps:encodingRuleCitation>
+      <jps:toolName>jff-py</jps:toolName>
+      <jps:toolVersion>0</jps:toolVersion>
+    </jps:encodingRule>
+  </jsima:exchangeMetadata>
+  <!-- ===================================================================== -->
+  <!-- 以下のdataset部分に情報を追記していく -->
+  <jsima:dataset>
+  </jsima:dataset>
+</jsima:GI>
