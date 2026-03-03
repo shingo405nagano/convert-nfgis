@@ -1,0 +1,8 @@
+pydantic
+pytest
+pytest-cov
+pytest-html
+pytest-asyncio
+PyYAML
+pyproj
+shapely
