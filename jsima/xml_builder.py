@@ -20,7 +20,10 @@ TEMPLATE_JSIMA_XML = os.path.join(os.path.dirname(__file__), ".confs", "jsima.xm
 
 
 class JsimaXmlBuilder(object):
-    """JSIMA XMLテンプレートを読み込み、dataset要素を編集して保存するビルダー。
+    """JSIMA XML テンプレートを読み込み、`dataset` 配下を構築するビルダー。
+
+    テンプレート XML を基点に、現場情報・測点・ポリゴン関連オブジェクトを
+    追記して最終的な JSIMA 形式 XML を生成する。
 
     Example:
         >>> from jsima.xml_builder import JsimaXmlBuilder
@@ -43,10 +46,13 @@ class JsimaXmlBuilder(object):
     }
 
     def __init__(self, template_path: str = TEMPLATE_JSIMA_XML) -> None:
-        """テンプレートXMLを読み込み、timeStampを現在時刻で初期化する。
+        """テンプレート XML を読み込み、ビルダーの初期状態を作成する。
 
         Args:
-            template_path: 参照するJSIMA XMLテンプレートのパス。
+            template_path: 参照する JSIMA XML テンプレートのパス。
+
+        Raises:
+            ValueError: テンプレート内に `jsima:dataset` 要素が存在しない場合。
         """
         self.template_path = Path(template_path)
         self._register_namespaces()
@@ -67,7 +73,7 @@ class JsimaXmlBuilder(object):
         attrib: dict[str, str] | None = None,
         namespace: str = "jsima",
     ) -> ET.Element:
-        """`<jsima:dataset>`配下に単一要素を追加する。
+        """`<jsima:dataset>` 直下へ単一要素を追加する。
 
         Args:
             local_name: 追加する要素のローカル名。
@@ -77,6 +83,9 @@ class JsimaXmlBuilder(object):
 
         Returns:
             追加したElementオブジェクト。
+
+        Raises:
+            ValueError: `namespace` が未定義プレフィックスの場合。
         """
         uri = self.NS.get(namespace)
         if uri is None:
@@ -89,10 +98,16 @@ class JsimaXmlBuilder(object):
         return element
 
     def add_dataset_xml(self, xml_fragment: str) -> None:
-        """`<jsima:dataset>`配下にXML断片をそのまま追加する。
+        """`<jsima:dataset>` 配下に XML 断片を追加する。
+
+        受け取った断片を名前空間付きの一時ルートでパースし、
+        生成された子要素を `dataset` 直下へ順に追加する。
 
         Args:
             xml_fragment: 追加したいXML文字列。
+
+        Raises:
+            xml.etree.ElementTree.ParseError: `xml_fragment` が不正な XML の場合。
         """
         wrapper = (
             f'<root xmlns:jsima="{self.NS["jsima"]}" '
@@ -125,6 +140,9 @@ class JsimaXmlBuilder(object):
 
         Returns:
             追加した `jsima:GenbaJoho` 要素。
+
+        Raises:
+            ValueError: `coordinate_system` または `crs` が列挙定義外の値の場合。
 
         ## JsimaCoordinateSystemEnum:
           - JPR_01 = 1
@@ -172,7 +190,22 @@ class JsimaXmlBuilder(object):
         number: int | None = None,
         name: str = "",
     ) -> ET.Element:
-        """`<jsima:object>`配下に`<jps:GM_Point>`を1件追加する。"""
+        """`<jsima:object>` 配下へ `GM_Point` を 1 件追加する。
+
+        Args:
+            point_id: 追加する `GM_Point` の ID（`pnt0000001` 形式）。
+            uuidref: 座標参照系 UUID。
+            x: X 座標。
+            y: Y 座標。
+            number: 点番号。`None` の場合は `point_id` から逆算。
+            name: 対応する `Sokuten` 名称。
+
+        Returns:
+            追加された `jps:GM_Point` 要素。
+
+        Raises:
+            ValueError: `point_id` 形式が不正、または `point_id` と `number` が不整合な場合。
+        """
         point_number = number
         if point_number is None:
             if not point_id.startswith("pnt"):
@@ -197,7 +230,14 @@ class JsimaXmlBuilder(object):
         return self._append_gm_point_element(object_element, model)
 
     def add_gm_points(self, points: JsimaGmPointModels) -> list[ET.Element]:
-        """`JsimaGmPointModels`内の全`GM_Point`を`<jsima:object>`へ追加する。"""
+        """`JsimaGmPointModels` 内の全 `GM_Point` を追加する。
+
+        Args:
+            points: 追加対象の点モデル集合。
+
+        Returns:
+            追加した `jps:GM_Point` 要素の配列。
+        """
         object_element = self._get_or_create_object_element()
         result: list[ET.Element] = []
         for point in points.values():
@@ -205,11 +245,25 @@ class JsimaXmlBuilder(object):
         return result
 
     def add_sokuten(self, point: JsimaGmPointModel) -> ET.Element:
-        """`<jsima:object>`配下に`<jsima:Sokuten>`を1件追加する。"""
+        """`<jsima:object>` 配下へ `Sokuten` を 1 件追加する。
+
+        Args:
+            point: 測点情報を保持した点モデル。
+
+        Returns:
+            追加された `jsima:Sokuten` 要素。
+        """
         return self._append_sokuten_element(point)
 
     def add_sokutens(self, points: JsimaGmPointModels) -> list[ET.Element]:
-        """`JsimaGmPointModels`内の全`Sokuten`を`<jsima:object>`へ追加する。"""
+        """`JsimaGmPointModels` 内の全 `Sokuten` を追加する。
+
+        Args:
+            points: 追加対象の点モデル集合。
+
+        Returns:
+            追加した `jsima:Sokuten` 要素の配列。
+        """
         result: list[ET.Element] = []
         for point in points.values():
             result.append(self._append_sokuten_element(point))
@@ -221,7 +275,22 @@ class JsimaXmlBuilder(object):
         point_models: JsimaGmPointModels,
         index: int,
     ) -> dict[str, ET.Element | list[ET.Element]]:
-        """`<jsima:object>`へ外周由来の`GM_Curve/GM_Surface/Kakuchi/Chiban`を追加する。"""
+        """外周情報から面地物関連要素群をまとめて追加する。
+
+        1 回の呼び出しで `GM_Curve` 群、`GM_Surface`、`Kakuchi`、`Chiban` を
+        連動した ID で生成し、`<jsima:object>` 配下へ追加する。
+
+        Args:
+            polygon_model: 面地物の属性とジオメトリ情報。
+            point_models: 外周頂点に対応する `GM_Point` 集合（閉合点を除く）。
+            index: 各要素 ID 生成に使う基準インデックス。
+
+        Returns:
+            追加した要素を `curves/surface/kakuchi/chiban` キーでまとめた辞書。
+
+        Raises:
+            ValueError: 点数が外周頂点数と一致しない場合、または `chimoku` 未設定の場合。
+        """
         object_element = self._get_or_create_object_element()
         points = point_models.values()
         required_points = polygon_model.exterior_vertex_count()
@@ -277,6 +346,9 @@ class JsimaXmlBuilder(object):
 
         Returns:
             保存先のPathオブジェクト。
+
+        Notes:
+            出力前に `ET.indent` で 2 スペース整形を行う。
         """
         ET.indent(self.tree, space="  ")
         output = Path(output_path)
@@ -291,6 +363,10 @@ class JsimaXmlBuilder(object):
 
         Returns:
             XML宣言を含むXML文字列。
+
+        Notes:
+            ルート要素をディープコピーした一時ツリーを整形し、
+            元のツリー構造には影響を与えない。
         """
         clone = ET.ElementTree(deepcopy(self.root))
         ET.indent(clone, space="  ")
@@ -299,13 +375,25 @@ class JsimaXmlBuilder(object):
 
     @classmethod
     def _register_namespaces(cls) -> None:
-        """ElementTreeへ利用する名前空間を登録する。"""
+        """`xml.etree.ElementTree` に利用する名前空間を登録する。
+
+        `write()` 時に意図したプレフィックスで出力されるよう、
+        クラス定義の `NS` マッピングを一括登録する。
+        """
         for prefix, uri in cls.NS.items():
             ET.register_namespace(prefix, uri)
 
     @staticmethod
     def _format_jsima_date(value: datetime.date | str | None) -> str:
-        """JSIMA向けの日付文字列を `YYYY-M-D` 形式で返す。"""
+        """JSIMA 向けの日付文字列を `YYYY-M-D` 形式へ正規化する。
+
+        Args:
+            value: `date`、日付文字列、または `None`。
+
+        Returns:
+            `None` の場合は当日、`date` の場合は同形式へ変換、
+            文字列の場合はそのまま返した値。
+        """
         if value is None:
             current = datetime.date.today()
             return f"{current.year}-{current.month}-{current.day}"
@@ -314,7 +402,11 @@ class JsimaXmlBuilder(object):
         return value
 
     def _get_or_create_object_element(self) -> ET.Element:
-        """`<jsima:dataset>`直下の`<jsima:object>`を取得または作成する。"""
+        """`<jsima:dataset>` 直下の `object` 要素を取得または新規作成する。
+
+        Returns:
+            既存または新規作成した `jsima:object` 要素。
+        """
         object_element = self._dataset.find("jsima:object", self.NS)
         if object_element is None:
             object_element = ET.SubElement(
@@ -325,7 +417,17 @@ class JsimaXmlBuilder(object):
     def _append_gm_point_element(
         self, object_element: ET.Element, point: JsimaGmPointModel
     ) -> ET.Element:
-        """`<jsima:object>`配下へ`<jps:GM_Point>`を追加する。"""
+        """`<jsima:object>` 配下へ `jps:GM_Point` 要素を追加する。
+
+        初回追加時にはセクション見出しコメント（参照される座標）も付与する。
+
+        Args:
+            object_element: 追加先の `jsima:object` 要素。
+            point: 追加する点情報。
+
+        Returns:
+            追加された `jps:GM_Point` 要素。
+        """
         if object_element.find("jps:GM_Point", self.NS) is None:
             object_element.append(
                 ET.Comment(
@@ -349,7 +451,16 @@ class JsimaXmlBuilder(object):
         return gm_point
 
     def _append_sokuten_element(self, point: JsimaGmPointModel) -> ET.Element:
-        """`<jsima:object>`配下へ`<jsima:Sokuten>`を追加する。"""
+        """`<jsima:object>` 配下へ `jsima:Sokuten` 要素を追加する。
+
+        初回追加時にはセクション見出しコメント（測点）も付与する。
+
+        Args:
+            point: 追加する測点情報。
+
+        Returns:
+            追加された `jsima:Sokuten` 要素。
+        """
         object_element = self._get_or_create_object_element()
         if object_element.find("jsima:Sokuten", self.NS) is None:
             object_element.append(
@@ -379,7 +490,18 @@ class JsimaXmlBuilder(object):
         points: list[JsimaGmPointModel],
         curve_ids: list[str],
     ) -> list[ET.Element]:
-        """外周を構成する`GM_Curve`群を追加する。"""
+        """外周辺に対応する `GM_Curve` 群を追加する。
+
+        各曲線は `points[i] -> points[i+1]`（末尾は先頭へ閉合）として生成する。
+
+        Args:
+            object_element: 追加先の `jsima:object` 要素。
+            points: 外周頂点に対応する点モデル配列。
+            curve_ids: 生成する曲線 ID 配列。
+
+        Returns:
+            追加された `jps:GM_Curve` 要素配列。
+        """
         self._append_section_comment_once(object_element, "jps:GM_Curve", "GM_Curve")
         result: list[ET.Element] = []
         size = len(points)
@@ -441,7 +563,18 @@ class JsimaXmlBuilder(object):
         ring_id: str,
         curve_ids: list[str],
     ) -> ET.Element:
-        """`GM_Surface`を追加する。"""
+        """`GM_Curve` 群を参照する `GM_Surface` を追加する。
+
+        Args:
+            object_element: 追加先の `jsima:object` 要素。
+            surface_id: `GM_Surface` の ID。
+            boundary_id: 境界要素 ID。
+            ring_id: 外周リング ID。
+            curve_ids: 外周を構成する `GM_Curve` ID 配列。
+
+        Returns:
+            追加された `jps:GM_Surface` 要素。
+        """
         self._append_section_comment_once(
             object_element, "jps:GM_Surface", "GM_Surface"
         )
@@ -491,7 +624,18 @@ class JsimaXmlBuilder(object):
         name: str,
         surface_id: str,
     ) -> ET.Element:
-        """`Kakuchi`を追加する。"""
+        """`Kakuchi` 要素を追加する。
+
+        Args:
+            object_element: 追加先の `jsima:object` 要素。
+            kakuchi_id: `Kakuchi` ID。
+            number: 画地番号。
+            name: 画地名称。
+            surface_id: 参照する `GM_Surface` ID。
+
+        Returns:
+            追加された `jsima:Kakuchi` 要素。
+        """
         self._append_section_comment_once(object_element, "jsima:Kakuchi", "画地")
         kakuchi = ET.SubElement(
             object_element,
@@ -517,7 +661,20 @@ class JsimaXmlBuilder(object):
         rotation_value: int,
         kakuchi_id: str,
     ) -> ET.Element:
-        """`Chiban`を追加する。"""
+        """`Chiban` 要素を追加する。
+
+        Args:
+            object_element: 追加先の `jsima:object` 要素。
+            chiban_id: `Chiban` ID。
+            chimoku_value: 地目コード値。
+            area_text: 面積文字列（小数桁整形済み）。
+            comment: 任意コメント。`None` の場合は出力しない。
+            rotation_value: 回転方向コード値。
+            kakuchi_id: 参照する `Kakuchi` ID。
+
+        Returns:
+            追加された `jsima:Chiban` 要素。
+        """
         self._append_section_comment_once(object_element, "jsima:Chiban", "地番")
         chiban = ET.SubElement(
             object_element,
@@ -546,7 +703,13 @@ class JsimaXmlBuilder(object):
         element_xpath: str,
         title: str,
     ) -> None:
-        """対象要素が未作成の場合のみ見出しコメントを追加する。"""
+        """セクション要素が未作成のときだけ見出しコメントを挿入する。
+
+        Args:
+            object_element: コメント挿入先の `jsima:object` 要素。
+            element_xpath: 対象要素の XPath（名前空間プレフィックス付き）。
+            title: 見出しコメントの文言。
+        """
         if object_element.find(element_xpath, self.NS) is not None:
             return
         object_element.append(
@@ -562,7 +725,19 @@ class JsimaXmlBuilder(object):
         enum_cls: type[JsimaCoordinateSystemEnum] | type[JsimaCrsEnum],
         arg_name: str,
     ) -> int:
-        """Enumまたは整数を受け取り、Enum定義された整数値へ正規化する。"""
+        """列挙値または整数入力を列挙定義済み整数へ正規化する。
+
+        Args:
+            value: 列挙インスタンス、整数、または整数化可能な値。
+            enum_cls: 検証対象の列挙型。
+            arg_name: エラー文言に出力する引数名。
+
+        Returns:
+            列挙定義に存在する整数値。
+
+        Raises:
+            ValueError: `value` が `enum_cls` で許可されない値の場合。
+        """
         if isinstance(value, enum_cls):
             return int(value.value)
 

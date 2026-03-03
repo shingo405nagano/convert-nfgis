@@ -4,18 +4,19 @@ from .enums import JsimaJpsUuidRefEnum
 
 
 class JsimaGmPointModel(pydantic.BaseModel):
-    """JSIMAのGM_Pointを表すモデル
+    """JSIMA/JPGIS の `GM_Point` と `Sokuten` 参照情報を保持するモデル。
 
-    使用するタグは'<jsima:GM_Point>'
+    本モデルは座標値と参照系 (`uuidref`) を受け取り、JSIMA XML 生成時に必要となる
+    識別子を一貫した規則で自動採番する。
 
     Attributes:
-
-         - uuidref: GM_Pointの測地系を表すUUID参照
-         - x: GM_PointのX座標
-         - y: GM_PointのY座標
-         - id: GM_PointのID.他のオブジェクトから参照するための識別子
-         - number: GM_Pointのインデックス.連番で管理される
-         - name: GM_Pointの名称.任意の文字列
+        x: 点の X 座標。
+        y: 点の Y 座標。
+        uuidref: 座標参照系を表す UUID 文字列。
+        number: 点番号（1 始まりの連番を想定）。
+        id: `GM_Point` 要素 ID（`pnt0000001` 形式）。
+        sokuten_id: `Sokuten` 要素 ID（`simapnt0000001` 形式）。
+        name: 測点名。`Sokuten/Name` に出力される。
     """
 
     x: float
@@ -29,7 +30,17 @@ class JsimaGmPointModel(pydantic.BaseModel):
     @pydantic.field_validator("uuidref", mode="before")
     @classmethod
     def validate_uuidref(cls, value):
-        """uuidrefがJsimaJpsUuidRefEnumのいずれかであることを検証する"""
+        """`uuidref` が許可された列挙値であることを検証・正規化する。
+
+        Args:
+            value: `JsimaJpsUuidRefEnum` または列挙値に対応する文字列。
+
+        Returns:
+            XML 出力に使える UUID 文字列。
+
+        Raises:
+            ValueError: `JsimaJpsUuidRefEnum` に存在しない値が指定された場合。
+        """
         if value not in JsimaJpsUuidRefEnum:
             raise ValueError(
                 f"uuidref must be one of {list(JsimaJpsUuidRefEnum.__members__.keys())}"
@@ -40,19 +51,21 @@ class JsimaGmPointModel(pydantic.BaseModel):
 
     @pydantic.model_validator(mode="after")
     def _validate_id(self) -> "JsimaGmPointModel":
-        """idが空の場合、numberから自動生成する"""
+        """`number` から `GM_Point`/`Sokuten` の識別子を生成する。
+
+        Returns:
+            識別子が補完された自身のモデルインスタンス。
+        """
         self.id = f"pnt{str(self.number).zfill(7)}"
         self.sokuten_id = f"simapnt{str(self.number).zfill(7)}"
         return self
 
 
 class JsimaGmPointModels(object):
-    """複数のJsimaGmPointModelを管理するクラス
+    """重複座標を除去しながら `JsimaGmPointModel` を集約するコンテナ。
 
-    - x_list: GM_PointのX座標のリスト
-    - y_list: GM_PointのY座標のリスト
-    - uuidref: GM_Pointの測地系を表すUUID参照
-    - id_template: GM_PointのIDテンプレート.デフォルトは'pnt{index}'で、indexは1から始まる連番
+    同一座標（小数点 9 桁に丸めたキー）が複数回現れた場合は 1 点として扱い、
+    `GM_Point` の重複生成を防ぐ。
     """
 
     def __init__(
@@ -64,19 +77,23 @@ class JsimaGmPointModels(object):
         names: list[str] | None = None,
         **kwargs,
     ):
-        """複数のJsimaGmPointModelを管理するクラス
+        """座標配列から `JsimaGmPointModel` 群を構築する。
 
         Args:
-            x_list: GM_PointのX座標のリスト
-            y_list: GM_PointのY座標のリスト
-            uuidref: GM_Pointの測地系を表すUUID参照
-            id_template: GM_PointのIDテンプレート.デフォルトは'pnt{index}'で、indexは1から始まる連番
-            start_index: GM_Pointの連番の開始値.デフォルトは1
+            x_list: X 座標列。
+            y_list: Y 座標列。
+            uuidref: 座標参照系 UUID。
+            start_index: `number` 採番の開始値。
+            names: 測点名リスト。`None` の場合は空文字で補完。
+            **kwargs: 互換性維持のため受け取る未使用引数。
+
+        Raises:
+            ValueError: `names` の要素数が座標数と一致しない場合。
 
         Attributes:
-            start_idx: GM_Pointの連番の開始値
-            end_idx: GM_Pointの連番の終了値
-            _points: 座標文字列キーで保持したGM_Pointモデルの辞書
+            start_idx: 連番開始値。
+            end_idx: 実際に作成された最後の連番。
+            _points: 座標キー（`"{x:.9f} {y:.9f}"`）で保持した点辞書。
         """
         self.start_idx = start_index
         self.end_idx = start_index + 1
@@ -105,22 +122,30 @@ class JsimaGmPointModels(object):
                 self.end_idx = i
 
     def as_dict(self) -> dict[str, JsimaGmPointModel]:
-        """座標文字列キーで保持したGM_Point辞書を返す。"""
+        """内部保持している座標キー付き辞書のコピーを返す。
+
+        Returns:
+            キーが座標文字列、値が `JsimaGmPointModel` の辞書。
+        """
         return dict(self._points)
 
     def values(self) -> list[JsimaGmPointModel]:
-        """保持しているGM_Pointモデル一覧を返す。"""
+        """保持している `JsimaGmPointModel` 一覧を返す。
+
+        Returns:
+            追加順で並んだ点モデルのリスト。
+        """
         return list(self._points.values())
 
     def search_id(self, x: float, y: float) -> str | None:
-        """指定された座標に対応するGM_PointのIDを検索する
+        """指定座標に対応する `GM_Point` ID を検索する。
 
         Args:
-            x: GM_PointのX座標
-            y: GM_PointのY座標
+            x: 検索対象の X 座標。
+            y: 検索対象の Y 座標。
 
         Returns:
-            指定された座標に対応するGM_PointのID.見つからない場合はNoneを返す
+            一致する `GM_Point` の ID。存在しない場合は `None`。
         """
         key = self._coordinate_key(x, y)
         point = self._points.get(key)
@@ -130,5 +155,13 @@ class JsimaGmPointModels(object):
 
     @staticmethod
     def _coordinate_key(x: float, y: float) -> str:
-        """座標辞書のキー文字列を返す。"""
+        """座標の正規化キーを生成する。
+
+        Args:
+            x: X 座標。
+            y: Y 座標。
+
+        Returns:
+            小数点 9 桁固定の `"x y"` 形式文字列。
+        """
         return f"{x:.9f} {y:.9f}"
