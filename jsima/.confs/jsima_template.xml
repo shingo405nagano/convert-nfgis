@@ -1,0 +1,455 @@
+<!--  ========== 測量機器工業会 ソフト部門会 ==========  -->
+<!--  ========== XML Schema for SIMA ==========  -->
+<?xml version='1.0' encoding='utf-8'?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="http://www.jsima.or.jp/JSIMASchema/201206" elementFormDefault="qualified" attributeFormDefault="unqualified" version="1.0.2">
+  <xs:annotation>
+    <xs:appinfo> jsima102.xsd </xs:appinfo>
+    <xs:documentation> 測量データ交換フォーマットSIMA XML Schema (XML Schema for Down Loaded Fundamental Geospatial Data)(JPGIS版) 2012年6月 (Jun 2012) 日本測量機器工業会 (Japan Surveying Instruments Manufacturer's Association) </xs:documentation>
+  </xs:annotation>
+  <xs:import namespace="http://www.gsi.go.jp/GIS/jpgis/standardSchemas2.1_2009-05" schemaLocation="http://www.gsi.go.jp/GIS/jpgis/standardSchemas2.1_2009-05/jpsRoot.xsd" />
+  <!-- ===================================================================== -->
+  <!-- ==== ルート要素 ==== -->
+  <xs:element name="GI">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="exchangeMetadata" type="jps:ExchangeMetadata" />
+        <xs:element name="dataset" type="jsima:Dataset" minOccurs="0" />
+      </xs:sequence>
+      <xs:attribute name="version" type="jps:CharacterString" fixed="1.0" />
+      <xs:attribute name="timeStamp" type="jps:DateTime" use="required" />
+    </xs:complexType>
+  </xs:element>
+  <xs:complexType name="Dataset">
+    <xs:sequence>
+      <xs:element name="GenbaJoho" type="jsima:現場情報" minOccurs="0" />
+      <xs:element ref="jsima:object" />
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="object">
+    <xs:complexType>
+      <xs:group ref="jsima:Object" minOccurs="0" maxOccurs="unbounded" />
+      <xs:attributeGroup ref="jps:IM_ObjectReference" />
+    </xs:complexType>
+  </xs:element>
+  <xs:group name="Object">
+    <xs:sequence>
+      <xs:any namespace="http://www.jsima.or.jp/JSIMASchema/201206 http://www.gsi.go.jp/GIS/jpgis/standardSchemas2.1_2009-05" />
+    </xs:sequence>
+  </xs:group>
+  <!-- ===================================================================== -->
+  <!-- ==== 現場情報 ==== -->
+  <xs:element name="GenbaJoho" type="jsima:現場情報" />
+  <xs:complexType name="現場情報">
+    <xs:complexContent>
+      <xs:extension base="jps:IM_Object">
+        <xs:sequence>
+          <!--  現場名  -->
+          <xs:element name="Name" type="jps:CharacterString" minOccurs="0" />
+          <!--  座標系  -->
+          <xs:element name="CoordinateSystem" type="jsima:座標系" minOccurs="0" />
+          <!--  測地系  -->
+          <xs:element name="Crs" type="jps:Integer" minOccurs="0" />
+          <!--  作業機関  -->
+          <xs:element name="Worker" type="jps:CharacterString" minOccurs="0" />
+          <!--  計画機関  -->
+          <xs:element name="Client" type="jps:CharacterString" minOccurs="0" />
+          <!--  主任技術者  -->
+          <xs:element name="Engineer" type="jps:CharacterString" minOccurs="0" />
+          <!--  工期自  -->
+          <xs:element name="Start" type="jps:Date" minOccurs="0" />
+          <!--  工期至  -->
+          <xs:element name="End" type="jps:Date" minOccurs="0" />
+          <!--  備考  -->
+          <xs:element name="Comment" type="jps:CharacterString" minOccurs="0" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+  <!-- ===================================================================== -->
+  <!-- ==== 測点==== -->
+  <xs:element name="Sokuten" type="jsima:測点" />
+  <xs:complexType name="測点">
+    <xs:complexContent>
+      <xs:extension base="jps:IM_Object">
+        <xs:sequence>
+          <!--  点番号  -->
+          <xs:element name="Number" type="jps:Integer" minOccurs="1" />
+          <!--  点名称  -->
+          <xs:element name="Name" type="jps:CharacterString" minOccurs="0" />
+          <!--  標高  -->
+          <xs:element name="Altitude" type="jps:Real" minOccurs="0" />
+          <!--  点の参照  -->
+          <xs:element name="RefPoint" type="jps:ref_GM_Point" minOccurs="1" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+  <!-- ===================================================================== -->
+  <!-- ==== 画地==== -->
+  <xs:element name="Kakuchi" type="jsima:画地" />
+  <xs:complexType name="画地">
+    <xs:complexContent>
+      <xs:extension base="jps:IM_Object">
+        <xs:sequence>
+          <!--  画地番号  -->
+          <xs:element name="Number" type="jps:Integer" minOccurs="1" />
+          <!--  画地名  -->
+          <xs:element name="Name" type="jps:CharacterString" minOccurs="0" />
+          <!--  構成の参照  -->
+          <xs:element name="RefSurface" type="jps:ref_GM_Surface" minOccurs="1" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+  <!-- ===================================================================== -->
+  <!-- ==== 開放画地==== -->
+  <xs:element name="KaihouKakuchi" type="jsima:開放型画地" />
+  <xs:complexType name="開放型画地">
+    <xs:complexContent>
+      <xs:extension base="jps:IM_Object">
+        <xs:sequence>
+          <!--  画地番号  -->
+          <xs:element name="Number" type="jps:Integer" minOccurs="1" />
+          <!--  画地名  -->
+          <xs:element name="Name" type="jps:CharacterString" minOccurs="0" />
+          <!--  構成の参照  -->
+          <xs:element name="RefCurve" type="jps:ref_GM_Curve" minOccurs="1" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+  <!-- ===================================================================== -->
+  <!-- ==== 基準点 ==== -->
+  <xs:element name="Kijyunten" type="jsima:基準点" />
+  <xs:complexType name="基準点">
+    <xs:complexContent>
+      <xs:extension base="jps:IM_Object">
+        <xs:sequence>
+          <!--  緯度  -->
+          <xs:element name="B" type="jps:Real" minOccurs="0" />
+          <!--  経度  -->
+          <xs:element name="L" type="jps:Real" minOccurs="0" />
+          <!--  座標系 Coordinate System  -->
+          <xs:element name="cooSys" type="jsima:座標系" minOccurs="0" />
+          <!--  ジオイド高  Geoid Height  -->
+          <xs:element name="geoidH" type="jps:Real" minOccurs="0" />
+          <!--  等級  -->
+          <xs:element name="Class" type="jsima:基準点等級" minOccurs="0" />
+          <!--  縮尺係数 Scale factor  -->
+          <xs:element name="Scafac" type="jps:Real" minOccurs="0" />
+          <!--  真北方向角 True North Direction Angle  -->
+          <xs:element name="tnda" type="jps:Real" minOccurs="0" />
+          <!--  柱石長 Pillar length  -->
+          <xs:element name="pilLen" type="jps:Real" minOccurs="0" />
+          <!--  埋標形式 monumenting style -->
+          <xs:element name="monSys" type="jsima:埋標形式" minOccurs="0" />
+          <!--  標識 marker  -->
+          <xs:element name="mark" type="jsima:標識" minOccurs="0" />
+          <!--  標識番号 marker number  -->
+          <xs:element name="marNo" type="jps:CharacterString" minOccurs="0" />
+          <!--  アンテナ高 antenna Height  -->
+          <xs:element name="antHei" type="jps:Real" minOccurs="0" />
+          <!--  観測日 observation day  -->
+          <xs:element name="obsDay" type="jps:Date" minOccurs="0" />
+          <!--  計算日  -->
+          <xs:element name="CalcDay" type="jps:Date" minOccurs="0" />
+          <!--  助言番号  -->
+          <xs:element name="advNo" type="jps:CharacterString" minOccurs="0" />
+          <!--  測点の参照  -->
+          <xs:element name="RefSokuten" minOccurs="1">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="Sokuten" type="jsima:測点" minOccurs="0" />
+              </xs:sequence>
+              <xs:attributeGroup ref="jps:IM_ObjectReference" />
+            </xs:complexType>
+          </xs:element>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+  <!-- ===================================================================== -->
+  <!-- ==== 水準点 ==== -->
+  <xs:element name="Suijyunten" type="jsima:水準点" />
+  <xs:complexType name="水準点">
+    <xs:complexContent>
+      <xs:extension base="jps:IM_Object">
+        <xs:sequence>
+          <!--  平均標高  -->
+          <xs:element name="AveAltitude" type="jps:Real" minOccurs="0" />
+          <!--  緯度  -->
+          <xs:element name="B" type="jps:Real" minOccurs="0" />
+          <!--  経度  -->
+          <xs:element name="L" type="jps:Real" minOccurs="0" />
+          <!--  座標系  -->
+          <xs:element name="cooSys" type="jsima:座標系" minOccurs="0" />
+          <!--  等級  -->
+          <xs:element name="Class" type="jsima:水準点等級" minOccurs="0" />
+          <!--  観測日  -->
+          <xs:element name="obsDay" type="jps:Date" minOccurs="0" />
+          <!--  計算日  -->
+          <xs:element name="CalcDay" type="jps:Date" minOccurs="0" />
+          <!--  測点の参照  -->
+          <xs:element name="RefSokuten" minOccurs="1">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="Sokuten" type="jsima:測点" minOccurs="0" />
+              </xs:sequence>
+              <xs:attributeGroup ref="jps:IM_ObjectReference" />
+            </xs:complexType>
+          </xs:element>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+  <!-- ===================================================================== -->
+  <!-- ==== 地番 ==== -->
+  <xs:element name="Chiban" type="jsima:地番" />
+  <xs:complexType name="地番">
+    <xs:complexContent>
+      <xs:extension base="jps:IM_Object">
+        <xs:sequence>
+          <!--  現況地目  -->
+          <xs:element name="Chimoku" type="jsima:地目" minOccurs="0" />
+          <!--  公簿地目  -->
+          <xs:element name="KChimoku" type="jsima:地目" minOccurs="0" />
+          <!--  大字  -->
+          <xs:element name="OAza" type="jps:CharacterString" minOccurs="0" />
+          <!--  字  -->
+          <xs:element name="Aza" type="jps:CharacterString" minOccurs="0" />
+          <!--  面積  -->
+          <xs:element name="Area" type="jps:Real" minOccurs="0" />
+          <!--  公簿面積  -->
+          <xs:element name="KArea" type="jps:Real" minOccurs="0" />
+          <!--  所有者  -->
+          <xs:element name="Owner" type="jps:CharacterString" minOccurs="0" />
+          <!--  不動産番号  -->
+          <xs:element name="Regist" type="jps:CharacterString" minOccurs="0" />
+          <!--  備考  -->
+          <xs:element name="Comment" type="jps:CharacterString" minOccurs="0" />
+          <!--  回り方向  -->
+          <xs:element name="Rotation" type="jsima:回り方向" minOccurs="0" />
+          <!--  地番構成  -->
+          <xs:element name="RefKakuchi" minOccurs="1">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="Kakuchi" type="jsima:画地" minOccurs="0" />
+              </xs:sequence>
+              <xs:attributeGroup ref="jps:IM_ObjectReference" />
+            </xs:complexType>
+          </xs:element>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+  <!-- ===================================================================== -->
+  <!-- ==== 座標系列挙型 ==== -->
+  <xs:simpleType name="座標系">
+    <xs:restriction base="jps:CharacterString">
+      <xs:enumeration value="1" />
+      <!-- 1系 -->
+      <xs:enumeration value="2" />
+      <!-- 2系 -->
+      <xs:enumeration value="3" />
+      <!-- 3系 -->
+      <xs:enumeration value="4" />
+      <!-- 4系 -->
+      <xs:enumeration value="5" />
+      <!-- 5系 -->
+      <xs:enumeration value="6" />
+      <!-- 6系 -->
+      <xs:enumeration value="7" />
+      <!-- 7系 -->
+      <xs:enumeration value="8" />
+      <!-- 8系 -->
+      <xs:enumeration value="9" />
+      <!-- 9系 -->
+      <xs:enumeration value="10" />
+      <!-- 10系 -->
+      <xs:enumeration value="11" />
+      <!-- 11系 -->
+      <xs:enumeration value="12" />
+      <!-- 12系 -->
+      <xs:enumeration value="13" />
+      <!-- 13系 -->
+      <xs:enumeration value="14" />
+      <!-- 14系 -->
+      <xs:enumeration value="15" />
+      <!-- 15系 -->
+      <xs:enumeration value="16" />
+      <!-- 16系 -->
+      <xs:enumeration value="17" />
+      <!-- 17系 -->
+      <xs:enumeration value="18" />
+      <!-- 18系 -->
+      <xs:enumeration value="19" />
+      <!-- 19系 -->
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- ===================================================================== -->
+  <!-- ==== 基準点等級列挙型 ==== -->
+  <xs:simpleType name="基準点等級">
+    <xs:restriction base="jps:CharacterString">
+      <xs:enumeration value="KJ10" />
+      <!-- 電子基準点 -->
+      <xs:enumeration value="KJ11" />
+      <!-- 一等三角点 -->
+      <xs:enumeration value="KJ12" />
+      <!-- 二等三角点 -->
+      <xs:enumeration value="KJ13" />
+      <!-- 三等三角点 -->
+      <xs:enumeration value="KJ14" />
+      <!-- 4等基準点 -->
+      <xs:enumeration value="KJ21" />
+      <!-- 1級基準点 -->
+      <xs:enumeration value="KJ22" />
+      <!-- 2級基準点 -->
+      <xs:enumeration value="KJ23" />
+      <!-- 3級基準点 -->
+      <xs:enumeration value="KJ24" />
+      <!-- 4級基準点 -->
+      <xs:enumeration value="KJ99" />
+      <!-- その他の基準点 -->
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- ===================================================================== -->
+  <!-- ==== 水準点等級列挙型 ==== -->
+  <xs:simpleType name="水準点等級">
+    <xs:restriction base="jps:CharacterString">
+      <xs:enumeration value="SJ10" />
+      <!-- 基準水準点 -->
+      <xs:enumeration value="SJ11" />
+      <!-- 1等水準点 -->
+      <xs:enumeration value="SJ12" />
+      <!-- 2等水準点 -->
+      <xs:enumeration value="SJ13" />
+      <!-- 3等水準点 -->
+      <xs:enumeration value="SJ14" />
+      <!-- 4等水準点 -->
+      <xs:enumeration value="SJ21" />
+      <!-- 1級水準点 -->
+      <xs:enumeration value="SJ22" />
+      <!-- 2級水準点 -->
+      <xs:enumeration value="SJ23" />
+      <!-- 3級水準点 -->
+      <xs:enumeration value="SJ24" />
+      <!-- 4級水準点 -->
+      <xs:enumeration value="SJ99" />
+      <!-- その他の水準点 -->
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- ===================================================================== -->
+  <!-- ==== 埋標形式列挙型 ==== -->
+  <xs:simpleType name="埋標形式">
+    <xs:restriction base="jps:CharacterString">
+      <xs:enumeration value="0" />
+      <!-- 地上 -->
+      <xs:enumeration value="1" />
+      <!-- 地中 -->
+      <xs:enumeration value="2" />
+      <!-- 屋上 -->
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- ===================================================================== -->
+  <!-- ==== 標識列挙型 ==== -->
+  <xs:simpleType name="標識">
+    <xs:restriction base="jps:CharacterString">
+      <xs:enumeration value="0" />
+      <!-- 標石 -->
+      <xs:enumeration value="1" />
+      <!-- 金属標 -->
+      <xs:enumeration value="2" />
+      <!-- その他 -->
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- ===================================================================== -->
+  <!-- ==== 地目列挙型 ==== -->
+  <xs:simpleType name="地目">
+    <xs:restriction base="jps:CharacterString">
+      <!-- 田 -->
+      <xs:enumeration value="1" />
+      <!-- 畑 -->
+      <xs:enumeration value="2" />
+      <!-- 宅地 -->
+      <xs:enumeration value="3" />
+      <!-- 塩田 -->
+      <xs:enumeration value="4" />
+      <!-- 鉱泉地 -->
+      <xs:enumeration value="5" />
+      <!-- 池沼 -->
+      <xs:enumeration value="6" />
+      <!-- 山林 -->
+      <xs:enumeration value="7" />
+      <!-- 牧場 -->
+      <xs:enumeration value="8" />
+      <!-- 原野 -->
+      <xs:enumeration value="9" />
+      <!-- 墓地 -->
+      <xs:enumeration value="10" />
+      <!-- 境内地 -->
+      <xs:enumeration value="11" />
+      <!-- 運河用地 -->
+      <xs:enumeration value="12" />
+      <!-- 水道用地 -->
+      <xs:enumeration value="13" />
+      <!-- 用悪水路 -->
+      <xs:enumeration value="14" />
+      <!-- ため池 -->
+      <xs:enumeration value="15" />
+      <!-- 堤 -->
+      <xs:enumeration value="16" />
+      <!-- 井溝 -->
+      <xs:enumeration value="17" />
+      <!-- 保安林 -->
+      <xs:enumeration value="18" />
+      <!-- 公衆用道路 -->
+      <xs:enumeration value="19" />
+      <!-- 公園 -->
+      <xs:enumeration value="20" />
+      <!-- 鉄道用地 -->
+      <xs:enumeration value="21" />
+      <!-- 学校用地 -->
+      <xs:enumeration value="22" />
+      <!-- 雑種地 -->
+      <xs:enumeration value="23" />
+      <!-- その他(1から23に該当しない) -->
+      <xs:enumeration value="24" />
+      <!-- 不明等 -->
+      <xs:enumeration value="0" />
+      <!-- 道路 -->
+      <xs:enumeration value="81" />
+      <!-- 運河 -->
+      <xs:enumeration value="82" />
+      <!-- 用悪水路 -->
+      <xs:enumeration value="83" />
+      <!-- 堤防 -->
+      <xs:enumeration value="84" />
+      <!-- みぞ -->
+      <xs:enumeration value="85" />
+      <!-- 導水管 -->
+      <xs:enumeration value="86" />
+      <!-- 送水管 -->
+      <xs:enumeration value="87" />
+      <!-- 排水管 -->
+      <xs:enumeration value="88" />
+      <!-- 鉄道線路 -->
+      <xs:enumeration value="89" />
+      <!-- 軌道 -->
+      <xs:enumeration value="90" />
+      <!-- 河川 -->
+      <xs:enumeration value="91" />
+      <!-- その他（81から91に該当しない） -->
+      <xs:enumeration value="92" />
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- ===================================================================== -->
+  <!-- ==== 地番回り方向列挙型 ==== -->
+  <xs:simpleType name="回り方向">
+    <xs:restriction base="jps:CharacterString">
+      <xs:enumeration value="0" />
+      <!-- 右回り -->
+      <xs:enumeration value="1" />
+      <!-- 左回り -->
+    </xs:restriction>
+  </xs:simpleType>
+</xs:schema>
