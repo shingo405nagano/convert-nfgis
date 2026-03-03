@@ -93,7 +93,7 @@ class JsimaGmPointModels(object):
         for i, (x, y, name) in enumerate(
             zip(x_list, y_list, self.names), start=self.start_idx
         ):
-            key = f"{x:.3f} {y:.3f}"
+            key = self._coordinate_key(x, y)
             if key not in self._points:
                 self._points[key] = JsimaGmPointModel(
                     x=x,
@@ -122,8 +122,13 @@ class JsimaGmPointModels(object):
         Returns:
             指定された座標に対応するGM_PointのID.見つからない場合はNoneを返す
         """
-        key = f"{x:.3f} {y:.3f}"
+        key = self._coordinate_key(x, y)
         point = self._points.get(key)
         if point is not None:
             return point.id
         return None
+
+    @staticmethod
+    def _coordinate_key(x: float, y: float) -> str:
+        """座標辞書のキー文字列を返す。"""
+        return f"{x:.9f} {y:.9f}"
