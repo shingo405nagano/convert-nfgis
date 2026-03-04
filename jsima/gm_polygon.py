@@ -2,7 +2,6 @@ from typing import Optional, Union  # noqa: F401
 
 import pydantic  # noqa: F401
 import shapely  # noqa: F401
-from shapely.geometry.polygon import orient
 
 from .enums import (  # noqa: F401
     JsimaChimokuEnum,
@@ -33,7 +32,8 @@ def dissambly_poly_to_dict(geom, prefix="ply") -> dict[str, shapely.Polygon]:
     def add_poly(poly, tag):
         nonlocal counter
         key = f"{prefix}_{tag}_{counter}"
-        result[key] = poly
+        # 右回りに統一する
+        result[key] = shapely.orient_polygons(poly)
         counter += 1
 
     def process_polygon(p):
@@ -58,6 +58,27 @@ def dissambly_poly_to_dict(geom, prefix="ply") -> dict[str, shapely.Polygon]:
         return result
 
     return result
+
+
+def replacement_xy(polygon: shapely.Polygon) -> shapely.Polygon:
+    """ポリゴンの座標を (x, y) → (y, x) に入れ替える。
+
+    JSIMA XML 生成の際、座標系の違いにより、(x, y) の順序で座標が必要な場合があります。
+    この関数は、Shapely のポリゴンの座標を入れ替えるためのユーティリティです。
+
+    完全に単一の`Shell`のみを対象として、Polygonの座標を入れ替えます。
+
+    Args:
+        polygon: 入れ替え対象の `shapely.Polygon`。
+
+    Returns:
+        座標が入れ替えられた新しい `shapely.Polygon`。
+    """
+    # 外周の座標を入れ替える
+    if shapely.has_z(polygon):
+        # 3D座標の場合、z座標も保持する
+        return shapely.Polygon([(y, x, z) for x, y, z in polygon.exterior.coords])
+    return shapely.Polygon([(y, x) for x, y in polygon.exterior.coords])
 
 
 class JsimaGmPolygonModel(pydantic.BaseModel):
@@ -100,8 +121,6 @@ class JsimaGmPolygonModel(pydantic.BaseModel):
         value = shapely.make_valid(value)
         if value.is_empty:
             raise ValueError("polygon is empty")
-        # 右回りに統一
-        value = orient(value, sign=-1.0)
         return value
 
     @pydantic.model_validator(mode="after")
@@ -122,26 +141,6 @@ class JsimaGmPolygonModel(pydantic.BaseModel):
                     f"chimoku must be one of {list(JsimaChimokuEnum.__members__.keys())}"
                 )
         return self
-
-    def dissambly(self) -> list["JsimaGmPolygonModel"]:
-        """外周・内周ごとに分解した `JsimaGmPolygonModel` 一覧を返す。
-
-        Returns:
-            分解後ポリゴンを保持するモデル配列。各モデルの `name` には
-            `"<元name>_shell_n"` / `"<元name>_hole*_n"` 形式の識別名を付与する。
-        """
-        result = []
-        disassembled = dissambly_poly_to_dict(self.polygon, prefix=self.name)
-        for key, poly in disassembled.items():
-            result.append(
-                JsimaGmPolygonModel(
-                    polygon=poly,
-                    name=key,
-                    chimoku=self.chimoku,
-                    comment=self.comment,
-                )
-            )
-        return result
 
     def area(self, digits: int = 7) -> float:
         """ポリゴン面積を指定桁で丸めて返す。
@@ -170,9 +169,14 @@ class JsimaGmPolygonModel(pydantic.BaseModel):
         """
         x_list = []
         y_list = []
-        for x, y in self.polygon.exterior.coords:
-            x_list.append(x)
-            y_list.append(y)
+        if self.polygon.has_z:
+            for x, y, _ in self.polygon.exterior.coords:
+                x_list.append(x)
+                y_list.append(y)
+        else:
+            for x, y in self.polygon.exterior.coords:
+                x_list.append(x)
+                y_list.append(y)
         return JsimaGmPointModels(
             x_list=x_list,
             y_list=y_list,
@@ -200,8 +204,9 @@ class JsimaGmPolygonModel(pydantic.BaseModel):
         Returns:
             `crv000001` 形式の ID 配列。
         """
-        size = self.exterior_vertex_count()
-        return [f"crv{str(start_index + i).zfill(6)}" for i in range(size)]
+        start = self.start_idx
+        end = self.start_idx + self.exterior_vertex_count() - 1
+        return [f"crv{str(i).zfill(6)}" for i in range(start, end + 1)]
 
     @staticmethod
     def surface_id(index: int) -> str:
@@ -269,6 +274,4 @@ class JsimaGmPolygonModel(pydantic.BaseModel):
         Returns:
             外周が反時計回りなら `COUNTERCLOCKWISE`、それ以外は `CLOCKWISE`。
         """
-        if self.polygon.exterior.is_ccw:
-            return JsimaPolyRotationEnum.COUNTERCLOCKWISE
         return JsimaPolyRotationEnum.CLOCKWISE
