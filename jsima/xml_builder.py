@@ -163,14 +163,6 @@ class JsimaXmlBuilder(object):
         crs_value = self._coerce_enum_value(crs, JsimaCrsEnum, "crs")
         start_text = self._format_jsima_date(start)
         end_text = self._format_jsima_date(end)
-
-        self._dataset.append(
-            ET.Comment(
-                " ===================================================================== "
-            )
-        )  # type: ignore[arg-type]
-        self._dataset.append(ET.Comment("現場情報"))  # type: ignore[arg-type]
-
         genba = ET.SubElement(self._dataset, f"{{{self.NS['jsima']}}}GenbaJoho")
         ET.SubElement(genba, f"{{{self.NS['jsima']}}}Name").text = name
         ET.SubElement(genba, f"{{{self.NS['jsima']}}}CoordinateSystem").text = str(
@@ -348,8 +340,12 @@ class JsimaXmlBuilder(object):
             保存先のPathオブジェクト。
 
         Notes:
+            `<jsima:object>` 直下の第一階層要素を規定順へ並べ替えてから、
+            ファイルへ出力する。
             出力前に `ET.indent` で 2 スペース整形を行う。
         """
+        self._sort_object_children_for_output()
+        # コメントの挿入
         ET.indent(self.tree, space="  ")
         output = Path(output_path)
         self.tree.write(output, encoding=encoding, xml_declaration=True)
@@ -368,6 +364,7 @@ class JsimaXmlBuilder(object):
             ルート要素をディープコピーした一時ツリーを整形し、
             元のツリー構造には影響を与えない。
         """
+        self._sort_object_children_for_output()
         clone = ET.ElementTree(deepcopy(self.root))
         ET.indent(clone, space="  ")
         data = ET.tostring(clone.getroot(), encoding=encoding, xml_declaration=True)
@@ -428,14 +425,6 @@ class JsimaXmlBuilder(object):
         Returns:
             追加された `jps:GM_Point` 要素。
         """
-        if object_element.find("jps:GM_Point", self.NS) is None:
-            object_element.append(
-                ET.Comment(
-                    " ================================================================= "
-                )
-            )  # type: ignore[arg-type]
-            object_element.append(ET.Comment("参照される座標"))  # type: ignore[arg-type]
-
         gm_point = ET.SubElement(
             object_element,
             f"{{{self.NS['jps']}}}GM_Point",
@@ -462,13 +451,6 @@ class JsimaXmlBuilder(object):
             追加された `jsima:Sokuten` 要素。
         """
         object_element = self._get_or_create_object_element()
-        if object_element.find("jsima:Sokuten", self.NS) is None:
-            object_element.append(
-                ET.Comment(
-                    " ================================================================= "
-                )
-            )  # type: ignore[arg-type]
-            object_element.append(ET.Comment("測点"))  # type: ignore[arg-type]
 
         sokuten = ET.SubElement(
             object_element,
@@ -712,12 +694,41 @@ class JsimaXmlBuilder(object):
         """
         if object_element.find(element_xpath, self.NS) is not None:
             return
-        object_element.append(
-            ET.Comment(
-                " ================================================================= "
-            )
-        )  # type: ignore[arg-type]
-        object_element.append(ET.Comment(title))  # type: ignore[arg-type]
+
+    def _sort_object_children_for_output(self) -> None:
+        """`jsima:object` 直下の第一階層要素を出力順に並べ替える。
+
+        並び順は以下の通り。
+
+        1. `GM_Point`
+        2. `GM_Curve`
+        3. `GM_Surface`
+        4. `Sokuten`
+        5. `Kakuchi`
+        6. `Chiban`
+
+        既知タグ以外の要素・コメントは末尾へ維持順で配置する。
+        """
+        order = {
+            "GM_Point": 1,
+            "GM_Curve": 2,
+            "GM_Surface": 3,
+            "Sokuten": 4,
+            "Kakuchi": 5,
+            "Chiban": 6,
+        }
+
+        for object_element in self.root.findall(".//jsima:object", self.NS):
+            children = list(object_element)
+
+            def sort_key(element: ET.Element) -> tuple[int, int]:
+                if not isinstance(element.tag, str):
+                    return (99, 0)
+                local_name = element.tag.split("}", 1)[-1]
+                return (order.get(local_name, 99), 0)
+
+            sorted_children = sorted(children, key=sort_key)
+            object_element[:] = sorted_children
 
     @staticmethod
     def _coerce_enum_value(
