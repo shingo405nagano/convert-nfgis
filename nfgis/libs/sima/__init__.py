@@ -2,6 +2,8 @@ from .jsima.enums import (  # noqa: F401
     JsimaChimokuEnum,
     JsimaJpsUuidRefEnum,
     JsimaPolyRotationEnum,
+    JsimaCoordinateSystemEnum,
+    JsimaCrsEnum,
 )
 from .jsima.gm_point import JsimaGmPointModel, JsimaGmPointModels  # noqa: F401
 from .jsima.gm_polygon import JsimaGmPolygonModel, dissambly_poly_to_dict  # noqa: F401
@@ -15,5 +17,7 @@ __all__ = [
     "JsimaChimokuEnum",
     "JsimaJpsUuidRefEnum",
     "JsimaPolyRotationEnum",
+    "JsimaCoordinateSystemEnum",
+    "JsimaCrsEnum",
     "JsimaXmlBuilder",
 ]
