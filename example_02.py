@@ -72,9 +72,11 @@ jsima_builder.add_genba_joho(
     start="2026-3-3",
     end="2026-3-4",
 )
+# GM_Point モデル群を追加
 for point_models in lst_point_models:
     jsima_builder.add_gm_points(point_models)
 
+# ポリゴンオブジェクトを追加
 next_poly_index = 1
 for poly_model, point_models in zip(lst_poly_model, lst_point_models):
     jsima_builder.add_polygon_objects(
@@ -84,7 +86,9 @@ for poly_model, point_models in zip(lst_poly_model, lst_point_models):
     )
     next_poly_index += 1
 
+# Sokuten を追加
 for point_models in lst_point_models:
     jsima_builder.add_sokutens(point_models)
 
+# XML を保存
 jsima_builder.save("./jsima_builded_multi_poly.xml")
