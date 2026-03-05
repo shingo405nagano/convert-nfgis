@@ -1,4 +1,5 @@
 import os
+import warnings
 from typing import Any
 
 import pydantic
@@ -63,7 +64,10 @@ class FieldInfo(pydantic.BaseModel):
         try:
             return self.dtype(value)
         except (ValueError, TypeError):
-            raise ValueError(f"値 '{value}' を {self.dtype} に変換できません。")
+            warnings.warn(
+                f"値 '{value}' を {self.dtype} に変換できません。デフォルト値を使用します。"
+            )
+            return self.default
 
 
 class ConfigYaml(object):

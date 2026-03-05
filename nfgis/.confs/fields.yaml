@@ -150,23 +150,8 @@ gs:
     樹立年度: 
       ja: 樹立年度
       en: establishment_year
-      dtype: Integer
-      default: -1
-    shape_area: 
-      ja: 面積
-      en: shape_area
-      dtype: Float
-      default: 0.0
-    shape_length: 
-      ja: 周囲長
-      en: shape_length
-      dtype: Float
-      default: 0.0
-    mean_slope:
-      ja: 平均傾斜
-      en: mean_slope
-      dtype: Float
-      default: 0.0
+      dtype: string
+      default: "-"
     geometry: 
       ja: geometry
       en: geometry
