@@ -1,0 +1,20 @@
+chiriin_standard:
+  name: "地理院 標準地図"
+  url: "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png"
+  attr: "ベースマップ出典：国土地理院 標準地図"
+chiriin_pale:
+  name: "地理院 淡色地図"
+  url: "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png"
+  attr: "ベースマップ出典：国土地理院 淡色地図"
+chiriin_airborne:
+  name: "地理院 航空写真"
+  url: "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg"
+  attr: "ベースマップ出典：国土地理院 航空写真 | 電子国土基本図（オルソ画像） | 森林（国有林・民有林）の空中写真 | 地方公共団体の空中写真 | 簡易空中写真 | 国土画像情報 | Landsat8画像（GSI,TSIC,GEO Grid/AIST） | Landsat8画像（courtesy of the U.S. Geological Survey） | 海底地形（GEBCO）"
+chiriin_hillshade:
+  name: "地理院 陰影起伏図"
+  url: "https://cyberjapandata.gsi.go.jp/xyz/hillshademap/{z}/{x}/{y}.png"
+  attr: "ベースマップ出典：国土地理院 陰影起伏図"
+chiriin_chijiki:
+  name: "地理院 磁気図 2020年 偏角"
+  url: "https://cyberjapandata.gsi.go.jp/xyz/jikizu2020_chijiki_d/{z}/{x}/{y}.png"
+  attr: "ベースマップ出典：国土地理院 磁気図"

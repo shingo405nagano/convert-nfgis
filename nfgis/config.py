@@ -1,8 +1,10 @@
+import functools
 import os
 import warnings
 from typing import Any, NamedTuple
 
 import pydantic
+import requests
 import streamlit as st
 import yaml
 
@@ -15,6 +17,10 @@ with open(os.path.join(dirname, ".confs", "fields.yaml"), "r", encoding="utf-8")
 global URL_YAML
 with open(os.path.join(dirname, ".confs", "urls.yaml"), "r", encoding="utf-8") as f:
     URL_YAML = yaml.safe_load(f)
+
+global TILE_URLS
+with open(os.path.join(dirname, ".confs", "tiles.yaml"), "r", encoding="utf-8") as f:
+    TILE_URLS = yaml.safe_load(f)
 
 
 class FieldInfo(pydantic.BaseModel):
@@ -145,6 +151,8 @@ class StSessionKeys(NamedTuple):
     LOCALITY: str = "locality"
     MAIN_ADDRESS: str = "main_address"
     GEODATAFRAME: str = "geodataframe"
+    CHANGE_SCOPE: str = "change_scope"
+    LAST_EXTRACTED_QUERY: str = "last_extracted_query"
 
     def downloaded(self, prefecture: str) -> bool:
         """指定された都道府県のデータがダウンロードされているかを確認します。
@@ -161,4 +169,43 @@ class StSessionKeys(NamedTuple):
         return (
             prefecture in downloaded_data_dict
             and downloaded_data_dict[prefecture] is not None
+        )
+
+
+class TileUrl(pydantic.BaseModel):
+    """地図タイルのURLを表すクラスです。
+    Attributes:
+        name (str): タイルの名前
+        url (str): タイルのURLテンプレート
+        attr (str): タイルの著作権表示
+    """
+
+    name: str
+    url: str
+    attr: str
+
+
+class TileUrls(object):
+    def __init__(self):
+        self.__tile_urls = {key: TileUrl(**data) for key, data in TILE_URLS.items()}
+
+    @functools.cached_property
+    def tile_names(self) -> list[str]:
+        """利用可能なタイルの名前のリストを返します。"""
+        return [tile.name for tile in self.__tile_urls.values()]
+
+    def get_tile_url(self, name: str) -> TileUrl:
+        """タイルの名前から対応するTileUrlオブジェクトを取得します。
+        Args:
+            name (str): タイルの名前
+        Returns:
+            TileUrl: 対応するTileUrlオブジェクト
+        Raises:
+            ValueError: 指定されたタイルの名前に対応するTileUrlが見つからない場合
+        """
+        for tile in self.__tile_urls.values():
+            if tile.name == name:
+                return tile
+        raise ValueError(
+            f"指定されたタイルの名前 '{name}' に対応するTileUrlが見つかりません。"
         )
