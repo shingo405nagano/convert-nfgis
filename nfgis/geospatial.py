@@ -1,3 +1,5 @@
+from typing import Optional
+
 import geopandas as gpd
 
 from .fetch import GsShp
@@ -43,16 +45,24 @@ class GsShpData(GsShp):
         super().__init__(prefecture=prefecture, caterory=caterory, endswith=endswith)
 
     def query(
-        self, plan_area: str, office: str, branch_office: str, locality: str
+        self,
+        plan_area: str,
+        office: str,
+        branch_office: str,
+        locality: str,
+        main_address: Optional[int] = None,
     ) -> gpd.GeoDataFrame:
         """指定された条件でShapefileをクエリして返します。"""
         gdf = self.read_file(plan_area=plan_area)
-        filtered_gdf = gdf[
-            (gdf["計画区"] == plan_area)
-            & (gdf["署名称"] == office)
-            & (gdf["担当区"] == branch_office)
-            & (gdf["国有林名"] == locality)
-        ]
+        qs = (
+            f"計画区 == '{plan_area}'"
+            f" and 署名称 == '{office}'"
+            f" and 担当区 == '{branch_office}'"
+            f" and 国有林名 == '{locality}'"
+        )
+        if isinstance(main_address, int):
+            qs += f" and 林班主番 == '{main_address}'"
+        filtered_gdf = gdf.query(qs)
         filtered_gdf = self._cast_geodataframe(filtered_gdf)
         filtered_gdf = self._after_processing(filtered_gdf)
         return filtered_gdf
