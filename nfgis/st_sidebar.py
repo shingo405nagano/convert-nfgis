@@ -5,13 +5,23 @@ from .geospatial import GsShpData  # noqa: F401
 
 
 class SidebarUi:
-    """サイドバーのUIを管理するクラスです。"""
+    """サイドバーのUIを管理するクラスです。
+    Attributes:
+        prefectures (dict[str, str]): 都道府県名と対応するデータURLの辞書
+    """
 
     def __init__(self):
         self.prefectures: dict[str, str] = URL_YAML["GS_SHAPE_URLS"]
 
     def run(self):
-        st.title("🗾 都道府県の選択")
+        """ サイドバーのUIを表示する関数です。
+        
+         - 都道府県の選択とデータをダウンロードするUIを提供します。
+         - ダウンロードされたデータから、クエリ条件を選択するUIを提供します。
+         - クエリ条件の変更を検知し、抽出開始ボタンを押すと、条件に合うデータを抽出します。
+         - 抽出条件が変更された場合、マップの表示を更新するためのフラグを設定します。
+        """
+        st.header("🗾 都道府県の選択")
         col1, col2 = st.columns(2, vertical_alignment="bottom")
         selected_prefecture = col1.selectbox(
             "",
@@ -30,6 +40,7 @@ class SidebarUi:
             )
 
         if StSessionKeys.DOWNLOADED_DATA_DICT in st.session_state:
+            # セッションにダウンロードされたデータが存在する場合、クエリUIを表示する
             data = st.session_state[StSessionKeys.DOWNLOADED_DATA_DICT]
             if selected_prefecture in data:
                 self.query_ui(selected_prefecture)
@@ -39,6 +50,9 @@ class SidebarUi:
 
         ダウンロードしたデータは、Streamlitのセッションステートに保存され、後で他
         のコンポーネントからアクセスできるようになります。
+        セッションには都道府県名をキーとして`GsShpData`オブジェクトが保存されます。
+        Args:
+            prefecture (str): ダウンロード対象の都道府県名
         """
         if (
             StSessionKeys.DOWNLOADED_DATA_DICT in st.session_state
@@ -77,7 +91,8 @@ class SidebarUi:
             st.warning(f"{prefecture}のデータがセッションに保存されていません")
 
         shp: GsShpData = shp_all[prefecture]
-        # with st.expander(f"{prefecture}のデータから抽出"):
+        # クエリ条件の選択UIを提供
+        st.header("✏️ 地域でデータを絞り込む")
         category_data = shp.read_category()
         plan_area = st.selectbox("計画区", options=list(category_data.keys()))
         st.session_state[StSessionKeys.PLAN_AREA] = plan_area
@@ -111,11 +126,13 @@ class SidebarUi:
             last_extracted_query == current_query
         )
 
-        if st.button("抽出開始"):
+        if st.button("上記の条件で抽出を開始する", type="primary"):
             self._execute_query(prefecture, current_query)
         elif st.session_state[StSessionKeys.CHANGE_SCOPE] is False:
-            st.markdown(
-                "抽出条件を変更しました。抽出開始ボタンを押すと、条件に合うデータが抽出されます。"
+            if st.session_state.get(StSessionKeys.GEODATAFRAME) is None:
+                return
+            st.warning(
+                "🤔 抽出条件を変更しました。抽出開始ボタンを押すと、条件に合うデータが抽出されます。"
             )
 
     def _execute_query(self, prefecture: str, query_key: str):
