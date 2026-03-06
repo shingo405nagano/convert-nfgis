@@ -9,7 +9,6 @@ class SidebarUi:
 
     def __init__(self):
         self.prefectures: dict[str, str] = URL_YAML["GS_SHAPE_URLS"]
-        self.__query: str = "{prefecture}_{office}_{branch_office}_{locality}"
 
     def run(self):
         st.title("🗾 都道府県の選択")
@@ -51,7 +50,7 @@ class SidebarUi:
             cont = st.empty()
             cont.info(
                 f"{prefecture}のデータをダウンロードしています..."
-                "場所によっては1分程度かかる場合もあります。"
+                "地域によっては1分程度かかる場合もあります。"
             )
             shp = GsShpData(prefecture=prefecture)
             if st.session_state.get(StSessionKeys.DOWNLOADED_DATA_DICT) is None:
@@ -104,15 +103,22 @@ class SidebarUi:
                 "林班主番が選択されていません。サイズが大きくなる可能性があります。"
             )
 
-        if st.button("抽出開始"):
-            q = f"{plan_area}_{office}_{branch_office}_{locality}_{main_address}"
-            if q != self.__query:
-                self._execute_query(prefecture)
-            else:
-                size = st.session_state[StSessionKeys.GEODATAFRAME].shape[0]
-                st.info(f"抽出された小班数は{size}件です。")
+        current_query = (
+            f"{prefecture}_{plan_area}_{office}_{branch_office}_{locality}_{main_address}"
+        )
+        last_extracted_query = st.session_state.get(StSessionKeys.LAST_EXTRACTED_QUERY)
+        st.session_state[StSessionKeys.CHANGE_SCOPE] = (
+            last_extracted_query == current_query
+        )
 
-    def _execute_query(self, prefecture: str):
+        if st.button("抽出開始"):
+            self._execute_query(prefecture, current_query)
+        elif st.session_state[StSessionKeys.CHANGE_SCOPE] is False:
+            st.markdown(
+                "抽出条件を変更しました。抽出開始ボタンを押すと、条件に合うデータが抽出されます。"
+            )
+
+    def _execute_query(self, prefecture: str, query_key: str):
         """クエリを実行する関数です。
 
         Args:
@@ -131,6 +137,8 @@ class SidebarUi:
             main_address=st.session_state[StSessionKeys.MAIN_ADDRESS],
         )
         st.session_state[StSessionKeys.GEODATAFRAME] = gdf
+        st.session_state[StSessionKeys.LAST_EXTRACTED_QUERY] = query_key
+        st.session_state[StSessionKeys.CHANGE_SCOPE] = True
         content.empty()
         st.info(f"抽出された小班数は{gdf.shape[0]}件です。")
 
