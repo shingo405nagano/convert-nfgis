@@ -1,8 +1,9 @@
 import os
 import warnings
-from typing import Any
+from typing import Any, NamedTuple
 
 import pydantic
+import streamlit as st
 import yaml
 
 dirname = os.path.dirname(__file__)
@@ -130,3 +131,34 @@ class ConfigYaml(object):
                 f"指定された都道府県 '{prefecture}' に対応するURLが見つかりません。"
             )
         return url
+
+
+class StSessionKeys(NamedTuple):
+    """Streamlitのセッションステートで使用するキーを定義するクラスです。"""
+
+    PREFECTURE: str = "prefecture"
+    SHP_URL: str = "shp_url"
+    DOWNLOADED_DATA_DICT: str = "downloaded_data_dict"
+    PLAN_AREA: str = "plan_area"
+    OFFICE: str = "office"
+    BRANCH_OFFICE: str = "branch_office"
+    LOCALITY: str = "locality"
+    MAIN_ADDRESS: str = "main_address"
+    GEODATAFRAME: str = "geodataframe"
+
+    def downloaded(self, prefecture: str) -> bool:
+        """指定された都道府県のデータがダウンロードされているかを確認します。
+
+        Args:
+            prefecture (str): 都道府県名
+
+        Returns:
+            bool: データがダウンロードされている場合はTrue、そうでない場合はFalse
+        """
+        if self.DOWNLOADED_DATA_DICT not in st.session_state:
+            return False
+        downloaded_data_dict = st.session_state[self.DOWNLOADED_DATA_DICT]
+        return (
+            prefecture in downloaded_data_dict
+            and downloaded_data_dict[prefecture] is not None
+        )
