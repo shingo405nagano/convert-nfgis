@@ -189,22 +189,24 @@ class GsShp(object):
         shp_path = self.select_file_path(plan_area=plan_area)
         return self.read_shp(shp_path)
 
-    def read_category(self) -> dict[str, dict[str, dict[str, list[str]]]]:
-        """Zipファイル内の全てのShapefileを読み込み、署名称・担当区・国有林名で集約した辞書を返します。
+    def read_category(self) -> dict[str, dict[str, dict[str, dict[str, list[int]]]]]:
+        """
+        Zipファイル内の全てのShapefileを読み込み、署名称・担当区・国有林名・林班
+        で集約した辞書を返します。
 
         返り値の構造は以下の通りです:
         ```
         {
             "計画区1": {
                 "署名称A": {
-                    "担当区X": ["国有林名1", "国有林名2", ...],
-                    "担当区Y": ["国有林名3", "国有林名4", ...],
+                    "担当区X": {
+                        "国有林名1": [林班主番1, 林班主番2, ...],
+                        ...
+                    }
+                    "担当区Y": {
                     ...
                 },
                 "署名称B": {
-                    "担当区Z": ["国有林名5", "国有林名6", ...],
-                    ...
-                },
                 ...
             },
             "計画区2": {
@@ -214,7 +216,7 @@ class GsShp(object):
         }
         ```
         """
-        qcols = ["計画区", "署名称", "担当区", "国有林名"]
+        qcols = ["計画区", "署名称", "担当区", "国有林名", "林班主番"]
         data = {}
         for plan_area in self.plan_area_names:
             _gdf = self.query_shp(plan_area=plan_area, columns=qcols)
@@ -229,13 +231,16 @@ class GsShp(object):
                 off = row["署名称"]
                 boff = row["担当区"]
                 local = row["国有林名"]
+                main_addrs = row["林班主番"]
                 if keikaku not in data:
                     data[keikaku] = {}
                 if off not in data[keikaku]:
                     data[keikaku][off] = {}
                 if boff not in data[keikaku][off]:
-                    data[keikaku][off][boff] = []
-                data[keikaku][off][boff].append(local)
+                    data[keikaku][off][boff] = {}
+                if local not in data[keikaku][off][boff]:
+                    data[keikaku][off][boff][local] = [None]
+                data[keikaku][off][boff][local].append(int(main_addrs))
         return data
 
     def cleanup(self) -> None:
