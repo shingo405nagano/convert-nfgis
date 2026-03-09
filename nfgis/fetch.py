@@ -108,6 +108,7 @@ class GsShp(object):
         self.temp_dir_path = self.temp_dir_obj.name
         self.zip_file.extractall(path=self.temp_dir_path)
         self.extract_root_path = self._extract_root_path()
+        self.plan_area2keikaku = {}
 
     def _extract_root_path(self) -> str:
         """展開したデータセットのトップディレクトリパスを返します。"""
@@ -227,6 +228,8 @@ class GsShp(object):
                 .sort_values(by=qcols)
             )
             for _, row in grouped.iterrows():
+                if plan_area not in self.plan_area2keikaku:
+                    self.plan_area2keikaku[plan_area] = row["計画区"]
                 keikaku = row["計画区"]
                 off = row["署名称"]
                 boff = row["担当区"]

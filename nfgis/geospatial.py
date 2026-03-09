@@ -53,7 +53,9 @@ class GsShpData(GsShp):
         main_address: Optional[int] = None,
     ) -> gpd.GeoDataFrame:
         """指定された条件でShapefileをクエリして返します。"""
-        gdf = self.read_file(plan_area=plan_area)
+        # データ内の計画区名とファイル名としての計画区名が異なる場合がある為、ファイル名としての計画区名を取得する
+        file = {key: val for val, key in self.plan_area2keikaku.items()}.get(plan_area)
+        gdf = self.read_file(plan_area=file)
         qs = (
             f"計画区 == '{plan_area}'"
             f" and 署名称 == '{office}'"
