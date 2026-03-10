@@ -20,6 +20,6 @@ def search_protected(txt: str) -> str:
     for name in names:
         if pattern.search(name):
             return name
-    # 部分一致も見つからない場合は、Errorを返す
-    raise ValueError(f"保安林の名称 '{txt}' が見つかりませんでした。")
+    # 部分一致も見つからない場合は、'-'を返す
+    return "-"
     

@@ -4,6 +4,7 @@ import geopandas as gpd
 
 from .fields import DissolvedMainAddressFields, DissolvedProtectedForestFields  # noqa: F401
 from .fetch import GsShp
+from .protected import search_protected  # noqa: F401
 
 
 class GsShpData(GsShp):
@@ -110,6 +111,17 @@ class GsShpData(GsShp):
         locality: str,
         main_address: Optional[int] = None,
     ) -> gpd.GeoDataFrame:
+        """ 指定された条件でShapefileをクエリし、同名林班をディゾルブして返します。
+        
+        Args:
+            plan_area (str): 森林計画区
+            office (str): 署名称
+            branch_office (str): 担当区
+            locality (str): 国有林名
+            main_address (Optional[int]): 林班主番。指定された場合は、さらに林班主番でフィルタリングを行う。
+        Returns:
+            gpd.GeoDataFrame: クエリ結果のGeoDataFrame。同名林班がディゾルブされている。
+        """
         sub_addrs = self.query(
             plan_area=plan_area,
             office=office,
@@ -126,6 +138,61 @@ class GsShpData(GsShp):
             by=["main_address"], as_index=False, aggfunc=agg_dict
         )
         return main_addrs_gdf
+
+    def _get_protected_forest(self, gdf: gpd.GeoDataFrame) -> list[str]:
+        """ 保安林の種類を取得する
+        Returns:
+            list[str]: 保安林の種類のリスト
+        """
+        cols = [f"protected_forest_{i}" for i in range(1, 5)]
+        unique_pf = []
+        for col in cols:
+            unique_pf.extend(gdf[col].unique().tolist())
+        unique_pf = list(set([pf for pf in unique_pf if pf != "-"]))
+        return unique_pf     
+        
+
+    def query_protected_forest(
+        self,
+        plan_area: str,
+        office: str,
+        branch_office: str,
+        locality: str,
+    ) -> dict[str, gpd.GeoDataFrame]:
+        """ 保安林の種類ごとにクエリ結果をディゾルブして返す
+        Args:
+            plan_area (str): 森林計画区
+            office (str): 署名称
+            branch_office (str): 担当区
+            locality (str): 国有林名
+        Returns:
+            dict[str, gpd.GeoDataFrame]: 
+                保安林の種類をキー、クエリ結果のGeoDataFrameを値とする辞書。同名
+                林班がディゾルブされている。
+        """
+        sub_addrs = self.query(
+            plan_area=plan_area,
+            office=office,
+            branch_office=branch_office,
+            locality=locality,
+        )
+        cols = [f"protected_forest_{i}" for i in range(1, 5)]
+        base_pf_lst = self._get_protected_forest(sub_addrs)
+        gdfs = {}
+        for pf in base_pf_lst:
+            idx_lst = []
+            for pf_lst in sub_addrs[cols].apply(lambda row: [row[col] for col in cols], axis=1):
+                if pf in pf_lst: # type: ignore # 
+                    idx_lst.append(True)
+                else:
+                    idx_lst.append(False)
+            pf_gdf = (
+                sub_addrs[idx_lst].copy()
+                .dissolve(by=["office"], as_index=False, aggfunc={"branch_office": "first"})
+            )
+            pf_gdf[cols[0]] = pf
+            gdfs[pf] = pf_gdf
+        return gdfs
 
 
 class GeoJsonData(GsShpData):
