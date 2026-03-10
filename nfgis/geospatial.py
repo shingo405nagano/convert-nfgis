@@ -2,6 +2,7 @@ from typing import Optional
 
 import geopandas as gpd
 
+from .fields import DissolvedMainAddressFields, DissolvedProtectedForestFields  # noqa: F401
 from .fetch import GsShp
 
 
@@ -100,6 +101,31 @@ class GsShpData(GsShp):
         gdf["address"] = gdf["address"].apply(lambda s: s.replace("_林班_", ""))
         dissolved = gdf.dissolve(by=["office", "address"], as_index=False)
         return dissolved[cols].copy()
+
+    def query_main_address(
+        self,
+        plan_area: str,
+        office: str,
+        branch_office: str,
+        locality: str,
+        main_address: Optional[int] = None,
+    ) -> gpd.GeoDataFrame:
+        sub_addrs = self.query(
+            plan_area=plan_area,
+            office=office,
+            branch_office=branch_office,
+            locality=locality,
+            main_address=main_address,
+        )
+        fields = DissolvedMainAddressFields()
+        agg_dict = {}
+        agg_dict.update(fields.get_agg_method("office", lang="en"))
+        agg_dict.update(fields.get_agg_method("branch_office", lang="en"))
+        agg_dict.update(fields.get_agg_method("locality", lang="en"))
+        main_addrs_gdf = sub_addrs.dissolve(
+            by=["main_address"], as_index=False, aggfunc=agg_dict
+        )
+        return main_addrs_gdf
 
 
 class GeoJsonData(GsShpData):
