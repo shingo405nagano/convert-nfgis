@@ -1,7 +1,7 @@
 import functools
 import os
 import warnings
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Optional
 
 import pydantic
 import requests
@@ -22,6 +22,10 @@ global TILE_URLS
 with open(os.path.join(dirname, ".confs", "tiles.yaml"), "r", encoding="utf-8") as f:
     TILE_URLS = yaml.safe_load(f)
 
+global PROTECTED_FOREST_YAML
+with open(os.path.join(dirname, ".confs", "protected.yaml"), "r", encoding="utf-8") as f:
+    PROTECTED_FOREST_YAML = yaml.safe_load(f)
+
 
 class FieldInfo(pydantic.BaseModel):
     """属性情報を表すクラス
@@ -37,6 +41,7 @@ class FieldInfo(pydantic.BaseModel):
     en: str
     dtype: Any
     default: Any
+    agg: Optional[str] = pydantic.Field(default=None)
 
     @pydantic.field_validator("ja", "en", mode="before")
     def validate_string(cls, v):
@@ -83,6 +88,7 @@ class ConfigYaml(object):
     def __init__(self):
         self.field_yaml = FIELD_YAML
         self.url_yaml = URL_YAML
+        self.protected = PROTECTED_FOREST_YAML
 
     @property
     def gs_shp_fields(self) -> dict[str, FieldInfo]:
